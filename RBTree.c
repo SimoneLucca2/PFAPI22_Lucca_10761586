@@ -26,6 +26,16 @@ bool is_string_greater(const char *s1, const char *s2) {
     return true;
 }
 
+bool is_string_acceptable(const char *s){
+    int i = 0;
+    while (s[i] != 0) {
+        if(!((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= '0' && s[i] <= '9') || s[i] == '-' || s[i] == '_')){
+            return false;
+        }
+    }
+    return true;
+}
+
 bool is_string_equal(const char *s1, const char *s2) {
     int i = 0;
     while (s1[i] != 0 || s2[i] != 0) {
@@ -57,7 +67,6 @@ void swap_nodes_parent_son(struct Node *a, struct Node *b){
     free(b_temp);
 
 }
-
 
 bool has_right_son(struct Node *n){
     if(n -> right_son == NULL)
@@ -95,30 +104,17 @@ void left_rotate(struct Node **Root, struct Node* pivot){
             b = pivot->right_son;
             //point 1
             b->parent = pivot->parent;
-
             //point 2
-            pivot->parent->left_son = b;
-            pivot->parent = b;
-            //point 3
-            if(has_left_son(b)) {
-                pivot->right_son = b->left_son;
-                //point 4
-                b->left_son = pivot;
-                //point 5
-                pivot->right_son -> parent = pivot;
+
+            //if pivot is the right son
+            if(has_right_son(pivot -> parent) && is_string_equal(pivot -> key, pivot->parent->right_son->key)) {
+                pivot->parent->right_son = b;
+            }
+            //if pivot is the left son
+            else if(pivot->parent->left_son != NULL && is_string_equal(pivot -> key, pivot->parent->left_son->key)) {
+                pivot->parent->left_son = b;
             }
 
-        }
-
-    }
-    else{
-
-        if(has_right_son(pivot)){
-            b = pivot->right_son;
-            //point 1
-            b->parent = NULL;
-            //point 2
-            pivot -> parent = b;
             //point 3
             if(has_left_son(b)) {
                 pivot->right_son = b->left_son;
@@ -128,9 +124,30 @@ void left_rotate(struct Node **Root, struct Node* pivot){
                 pivot->right_son -> parent = pivot;
             }
             else{
+                b->left_son = pivot;
+                pivot -> right_son = NULL;
+            }
+            pivot -> parent = b;
+
+
+        }
+
+    }
+    else{
+
+        if(has_right_son(pivot)){
+            b = pivot->right_son;
+            b->parent = NULL;
+            if(has_left_son(b)) {
+                pivot->right_son = b->left_son;
+                b->left_son = pivot;
+                pivot->right_son -> parent = pivot;
+            }
+            else{
                 b -> left_son = pivot;
                 pivot->right_son = NULL;
             }
+            pivot -> parent = b;
 
             *Root = b;
 
@@ -146,20 +163,29 @@ void right_rotate(struct Node **Root, struct Node* pivot){
 
         if(has_left_son(pivot)){
             a = pivot->left_son;
-            //point 1
             a->parent = pivot->parent;
+            //if pivot is the left son
+            if(has_left_son(pivot -> parent) && is_string_equal(pivot -> key, pivot->parent->left_son->key)) {
+                pivot->parent->left_son = a;
+            }
 
-            //point 2
-            pivot->parent->left_son = a;
+            //if pivot is the right son
+            else{
+                pivot->parent->right_son = a;
+            }
+
+
             pivot->parent = a;
-            //point 3
             if(has_right_son(a)) {
                 pivot->left_son = a->right_son;
-                //point 4
                 a->right_son = pivot;
-                //point 5
                 pivot->left_son -> parent = pivot;
             }
+            else{
+                a->right_son = pivot;
+                pivot -> left_son = NULL;
+            }
+            pivot -> parent = a;
 
         }
 
@@ -169,30 +195,24 @@ void right_rotate(struct Node **Root, struct Node* pivot){
 
         if(has_left_son(pivot)){
             a = pivot->left_son;
-            //point 1
             a->parent = NULL;
-            //point 2
-            pivot -> parent = a;
-            //point 3
+
             if(has_right_son(a)) {
                 pivot->left_son = a->right_son;
-                //point 4
                 a->right_son = pivot;
-                //point 5
                 pivot->left_son -> parent = pivot;
             }
             else{
                 a -> right_son = pivot;
                 pivot->left_son = NULL;
             }
+            pivot -> parent = a;
 
             *Root = a;
-            printf("hello");
         }
 
     }
 }
-
 
 //Used to maintain a RB tree
 void RB_insert_fixup(struct Node **Root, struct Node *new_node_ptr) {
@@ -207,79 +227,82 @@ void RB_insert_fixup(struct Node **Root, struct Node *new_node_ptr) {
         node_parent = new_node_ptr->parent;
         //if the parent is red that means that he also has a parent
         if (node_parent->color == red) {
-            //if grandparent has a left son
-            if ((node_parent->parent)->left_son != NULL) {
-                //if parent is the left son of the grandfather
-                if (((node_parent->parent)->left_son)->key == node_parent->key) {
-                    //initialization
-                    bool uncle_exists = false;
 
-                    if (( node_parent->parent)->right_son != NULL) {
-                        uncle_exists = true;
-                        node_uncle = (node_parent->parent)->right_son;
-                    }
+            //if parent is the left son of the grandfather
+            if ((node_parent->parent)->left_son != NULL && ((node_parent->parent)->left_son)->key == node_parent->key) {
 
-                    if (uncle_exists) {
-                        //if the uncle is red, CASE 1
-                        if (node_uncle->color == red) {
-                            node_parent->color = black;
-                            node_uncle->color = black;
-                            //if the grandparent is not the root
-                            if (!is_string_equal((node_parent->parent)->key, (*Root)->key)) {
-                                (node_parent->parent)->color = red;
-                                //repeat on the grandparent
-                                RB_insert_fixup(Root, node_parent->parent);
-                            }
-                        }
-                    }
-                    //if the node is the right son, CASE 2
-                    else if ((node_parent->right_son != NULL)) {
-                        if((node_parent->right_son)->key == new_node_ptr->key)
-                            left_rotate(Root, node_parent);
-                    }
-                    //CASE 3
-                    else {
-                        node_parent->color = black;
-                        (node_parent->parent)->color = red;
-                        right_rotate(Root, node_parent->parent);
-                    }
+                //initialization
+                bool uncle_exists = false;
+
+                if (( node_parent->parent)->right_son != NULL) {
+                    uncle_exists = true;
+                    node_uncle = (node_parent->parent)->right_son;
                 }
-            }
-            //if grandparent has a right son
-            else if ((node_parent->parent)->right_son != NULL) {
-                //if parent is the right son of the grandfather
-                if (((node_parent->parent)->right_son)->key == node_parent->key) {
 
+                if (uncle_exists) {
+                    //if the uncle is red, CASE 1
+                    if (node_uncle->color == red) {
 
-                    //initialization
-                    bool uncle_exists = false;
-
-                    if (( node_parent->parent)->left_son != NULL) {
-                        uncle_exists = true;
-                        node_uncle = (node_parent->parent)->left_son;
-                    }
-                    if(uncle_exists && node_uncle->color == red) {
-                        //if the uncle is red, CASE 1
                         node_parent->color = black;
                         node_uncle->color = black;
-                        if (!is_string_equal(node_parent->key, (*Root)->key)) {
+
+                        //if the grandparent is not the root
+                        if (!is_string_equal((node_parent->parent)->key, (*Root)->key)) {
                             (node_parent->parent)->color = red;
                             //repeat on the grandparent
                             RB_insert_fixup(Root, node_parent->parent);
                         }
                     }
+                }
+                //NOTE, here the uncle can exist black or not exist
+                //if the node is the right son, CASE 2
+                else if ((node_parent->right_son != NULL) && (node_parent->right_son)->key == new_node_ptr->key) {
+                    left_rotate(Root, node_parent);
+                    RB_insert_fixup(Root, node_parent);
+                }
+                //CASE 3
+                else {
+                    node_parent->color = black;
+                    (node_parent->parent)->color = red;
+                    right_rotate(Root, node_parent -> parent);
+                }
 
-                    //if the node is the left son, CASE 2
-                    else if ((node_parent->left_son)->key == new_node_ptr->key) {
-                        right_rotate(Root, node_parent);
-                    }
-                        //CASE 3
-                    else {
-                        node_parent->color = black;
+            }
+
+            //if parent is the right son of the grandfather
+            else if ((node_parent->parent)->right_son != NULL && ((node_parent->parent)->right_son)->key == node_parent->key) {
+
+                //initialization
+                bool uncle_exists = false;
+
+                if (( node_parent->parent)->left_son != NULL) {
+                    uncle_exists = true;
+                    node_uncle = (node_parent->parent)->left_son;
+                }
+                if(uncle_exists && node_uncle->color == red) {
+                    //if the uncle is red, CASE 1
+                    node_parent->color = black;
+                    node_uncle->color = black;
+                    if (!is_string_equal(node_parent->key, (*Root)->key)) {
                         (node_parent->parent)->color = red;
-                        right_rotate(Root, node_parent->parent);
+                        //repeat on the grandparent
+                        RB_insert_fixup(Root, node_parent->parent);
                     }
                 }
+
+                //if the node is the left son, CASE 2
+                else if(node_parent->left_son != NULL && (node_parent->left_son)->key == new_node_ptr->key) {
+                    right_rotate(Root, node_parent);
+                    RB_insert_fixup(Root, node_parent);
+                }
+
+                //CASE 3
+                else {
+                    node_parent->color = black;
+                    (node_parent->parent)->color = red;
+                    left_rotate(Root, node_parent -> parent);
+                }
+
 
             }
         }
@@ -344,10 +367,10 @@ int main() {
     struct Node* ROOT = (struct Node*)malloc(sizeof(struct Node));
     create_leaf(ROOT);
 
-    char *a[10] = {"ote", "ere", "drr", "bgx", "zud", "rad", "ulm", "not", "dpr", "ask"};
+    char *a[10] = {"oiu", "fgs", "uwt", "eyn", "ivj", "wty", "umr", "tre", "rdw", "sut"};
 
     for (int i = 0; i < 10; i++) {
-        struct Node *new_node_ptr = (struct Node*)malloc(sizeof(struct Node));
+        struct Node *new_node_ptr = malloc(sizeof(struct Node));
         create_leaf(new_node_ptr);
         new_node_ptr -> key = a[i];
         RB_insert(&ROOT, new_node_ptr);
