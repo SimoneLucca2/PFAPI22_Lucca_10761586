@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
-
 typedef enum { red, black } node_color;
 typedef enum { false, true } bool;
 
@@ -31,24 +29,10 @@ int max(int n1, int n2){
     else return n2;
 }
 
-
-// compares two strings in alphabetic order: 1 if s1 comes after s2
-bool is_string_greater(const char *s1, const char *s2) {
-    int i = 0;
-    while (s1[i] != 0 || s2[i] != 0) {
-        if (s1[i] > s2[i])
-            return true;
-        else if (s1[i] < s2[i])
-            return false;
-        i += 1;
-    }
-    return true;
-}
-
 bool is_string_valid(struct Node *Root, char *word){
     struct Node *iterate = Root;
     while(iterate != NULL && strcmp(iterate -> key, word) != 0){
-        if(is_string_greater(word, iterate->key)){
+        if(strcmp(word, iterate->key) > 0){
             iterate = iterate -> right_son;
         }
         else{
@@ -64,7 +48,7 @@ bool is_string_valid(struct Node *Root, char *word){
 bool is_string_present(struct Node *Root, char *word){
     struct Node *iterate = Root;
     while(iterate != NULL && strcmp(iterate -> key, word) != 0){
-        if(is_string_greater(word, iterate->key)){
+        if(strcmp(word, iterate->key) > 0){
             iterate = iterate -> right_son;
         }
         else{
@@ -442,7 +426,7 @@ void ITW_constraints(struct Node *Root, int *C_hash_table_missing, int *C_hash_t
 }
 
 // Given the Tree and the new node, insert the node in the Tree
-void RB_insert(struct Node **Root, struct Node* node_ptr) {
+void RB_insert(struct Node **Root, struct Node* node_ptr, bool is_RB) {
 
     // variable used to go through nodes in RB tree
     struct Node *iterate = *Root;
@@ -455,7 +439,7 @@ void RB_insert(struct Node **Root, struct Node* node_ptr) {
     // find the right place to insert the word
     while (1) {
 
-        if (is_string_greater(node_ptr -> key, iterate -> key)) {
+        if (strcmp(node_ptr -> key, iterate -> key) > 0) {
             if (iterate -> right_son == NULL)
                 break;
             iterate = iterate -> right_son;
@@ -470,15 +454,17 @@ void RB_insert(struct Node **Root, struct Node* node_ptr) {
     node_ptr -> parent = iterate;
 
     // insert right if larger
-    if (is_string_greater(node_ptr -> key, iterate -> key))
+    if (strcmp(node_ptr -> key, iterate -> key) > 0)
         iterate -> right_son = node_ptr;
 
         // insert right if larger
     else
         iterate -> left_son = node_ptr;
 
-    // balance the tree
-    RB_insert_fixup(Root, node_ptr);
+    if(is_RB) {
+        // balance the tree
+        RB_insert_fixup(Root, node_ptr);
+    }
 }
 
 //turns off the nodes that do not respect the constraints and counts them in legal_word_counter
@@ -572,7 +558,7 @@ void inserisci_inizio(struct Node **Root1, struct Node **Root2, char *last_test,
                 }
             }
 
-            RB_insert(Root1, new_node);
+            RB_insert(Root1, new_node, false);
         }
     }
     else{
@@ -604,8 +590,8 @@ void inserisci_inizio(struct Node **Root1, struct Node **Root2, char *last_test,
             }
 
 
-            RB_insert(Root1, new_node1);
-            RB_insert(Root2, new_node2);
+            RB_insert(Root1, new_node1, false);
+            RB_insert(Root2, new_node2, true);
         }
     }
 }
@@ -616,7 +602,7 @@ void build_selection_tree(struct Node *Root, struct Node **New_Tree){
             struct Node *new_node = malloc(sizeof(struct Node));
             create_leaf(new_node);
             new_node -> key = Root -> key;
-            RB_insert(New_Tree, new_node);
+            RB_insert(New_Tree, new_node, true);
         }
         build_selection_tree(Root->left_son, New_Tree);
         build_selection_tree(Root->right_son, New_Tree);
@@ -686,6 +672,7 @@ void word_result(const char* reference_word, struct R_Node* hash, int hash_dimen
 int main() {
 
 
+
     //reading and storing part
     //read k
     if(scanf("%d", &k) != 1) return 0;
@@ -706,27 +693,33 @@ int main() {
     struct Node* ROOT = (struct Node*)malloc(sizeof(struct Node));
     create_leaf(ROOT);
 
-
     //IT IS ASSUMED THAT THE INSERTED WORDS ARE VALID
     while(1){
-        char *word = malloc(sizeof(char) * max(k, 17));
-        if(scanf("%s", word) != 1) return 0;
+        char *word1 = malloc(sizeof(char) * max(k, 17));
+        char *word = malloc(sizeof(char) * k);
+
+        if(scanf("%s", word1) != 1) return 0;
 
         //start the game if true
-        if(strcmp(word, "+nuova_partita") == 0) break;
+        if(strcmp(word1, "+nuova_partita") == 0) break;
+
+        strcpy(word, word1);
+        free(word1);
 
         struct Node *new_node_ptr = (struct Node*)malloc(sizeof(struct Node));
         create_leaf(new_node_ptr);
 
         new_node_ptr -> key = word;
-        RB_insert(&ROOT, new_node_ptr);
+        RB_insert(&ROOT, new_node_ptr, false);
 
     }
+
 
     //game part
 
 
     while(1) {
+
 
         //this tree is used when the words are excluded
         struct Node* Selection_TREE = (struct Node*)malloc(sizeof(struct Node));
@@ -737,7 +730,7 @@ int main() {
         if (scanf("%s", R_word) != 1) return 0;
 
         //create the structure that contains reference word information
-        int hash_dimension = (6 * k) / 5;
+        int hash_dimension = k + 2;
         struct R_Node R_Hash_table[hash_dimension];
 
         //initialize
@@ -785,22 +778,27 @@ int main() {
         bool found = true;
         while (i < n) {
 
-            char *word = malloc(sizeof(char) * max(k, 17));
+            char *word1 = malloc(sizeof(char) * max(k, 17));
             char result[k];
-            if (scanf("%s", word) != 1) return 0;
+            if (scanf("%s", word1) != 1) return 0;
 
             if (i == 0) {
 
                 //exception +inserisci_inizio
-                if (strcmp(word, "+inserisci_inizio") == 0) {
+                if (strcmp(word1, "+inserisci_inizio") == 0) {
                     inserisci_inizio(&ROOT, NULL, last_test, last_result);
                     continue;
                 }
                 //exception +stampa_filtrate
-                else if (strcmp(word, "+stampa_filtrate") == 0) {
+                else if (strcmp(word1, "+stampa_filtrate") == 0) {
                     stampa_filtrate(ROOT);
                     continue;
                 } else {
+
+                    char *word = malloc(sizeof(char)*k);
+                    strcpy(word, word1);
+                    free(word1);
+
                     if (is_string_present(ROOT, word)) {
                         if(is_string_valid(ROOT, word)) strcpy(last_test,word);
                         //word result returns true if the word was found
@@ -818,8 +816,10 @@ int main() {
                             }
 
                             apply_constraints(ROOT, word, result);
+
                             legal_word_counter = 0;
                             inorder_tree_walk_counter(ROOT);
+
                             printf("\n%d", legal_word_counter);
                         }else{
                             printf("ok");
@@ -838,23 +838,33 @@ int main() {
             else {
 
                 //exception +inserisci_inizio
-                if (strcmp(word, "+inserisci_inizio") == 0) {
+                if (strcmp(word1, "+inserisci_inizio") == 0) {
                     inserisci_inizio(&ROOT, &Selection_TREE, last_test, last_result);
                     continue;
                 }
                 //exception +stampa_filtrate
-                if (strcmp(word, "+stampa_filtrate") == 0) {
+                if (strcmp(word1, "+stampa_filtrate") == 0) {
+
                     stampa_filtrate(Selection_TREE);
+
+
+
                     continue;
                 } else {
+
+                    char *word = malloc(sizeof(char)*k);
+                    strcpy(word, word1);
+                    free(word1);
+
                     if (is_string_present(ROOT, word)) {
                         if(!is_string_present(Selection_TREE, word)){
                             struct Node *new_node = malloc(sizeof(struct Node));
                             create_leaf(new_node);
                             new_node -> key = word;
-                            RB_insert(&Selection_TREE, new_node);
+                            RB_insert(&Selection_TREE, new_node, true);
                         }
                         //word result returns true if the word was found
+
                         word_result(R_word, R_Hash_table, hash_dimension, word, Selection_TREE, result);
 
                         if(is_string_valid(Selection_TREE, word)) {
@@ -874,8 +884,10 @@ int main() {
                             }
 
                             apply_constraints(Selection_TREE, word, result);
+
                             legal_word_counter = 0;
-                            inorder_tree_walk_counter(Selection_TREE);
+                            inorder_tree_walk_counter(Selection_TREE);\
+
                             printf("\n%d", legal_word_counter);
                         }else{
                             printf("ok");
@@ -916,6 +928,9 @@ int main() {
                 return 0;
             }
         }
+
+
+
     }
 }
 
