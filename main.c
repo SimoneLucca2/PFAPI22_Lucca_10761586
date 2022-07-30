@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
 
 
 typedef enum { red, black } node_color;
@@ -22,6 +24,7 @@ struct R_Node{
 };
 
 int n, k, legal_word_counter;
+bool missing_letters[64];
 
 int max(int n1, int n2){
     if(n1 > n2) return n1;
@@ -42,20 +45,25 @@ bool is_string_greater(const char *s1, const char *s2) {
     return true;
 }
 
-bool is_string_equal(const char *s1, const char *s2) {
-    int i = 0;
-    while (s1[i] != 0 || s2[i] != 0) {
-        if (s1[i] != s2[i])
-            return false;
-        i += 1;
+bool is_string_valid(struct Node *Root, char *word){
+    struct Node *iterate = Root;
+    while(iterate != NULL && strcmp(iterate -> key, word) != 0){
+        if(is_string_greater(word, iterate->key)){
+            iterate = iterate -> right_son;
+        }
+        else{
+            iterate = iterate -> left_son;
+        }
     }
+    if(iterate == NULL || iterate -> valid == false) return false;
     return true;
 }
 
+
 //look for the string in the tree
-bool is_string_valid(struct Node *Root, char *word){
+bool is_string_present(struct Node *Root, char *word){
     struct Node *iterate = Root;
-    while(iterate != NULL && !is_string_equal(iterate -> key, word)){
+    while(iterate != NULL && strcmp(iterate -> key, word) != 0){
         if(is_string_greater(word, iterate->key)){
             iterate = iterate -> right_son;
         }
@@ -106,11 +114,11 @@ void left_rotate(struct Node **Root, struct Node* pivot){
             //point 2
 
             //if pivot is the right son
-            if(has_right_son(pivot -> parent) && is_string_equal(pivot -> key, pivot->parent->right_son->key)) {
+            if(has_right_son(pivot -> parent) && strcmp(pivot -> key, pivot->parent->right_son->key) == 0) {
                 pivot->parent->right_son = b;
             }
                 //if pivot is the left son
-            else if(pivot->parent->left_son != NULL && is_string_equal(pivot -> key, pivot->parent->left_son->key)) {
+            else if(pivot->parent->left_son != NULL && strcmp(pivot -> key, pivot->parent->left_son->key) == 0) {
                 pivot->parent->left_son = b;
             }
 
@@ -164,7 +172,7 @@ void right_rotate(struct Node **Root, struct Node* pivot){
             a = pivot->left_son;
             a->parent = pivot->parent;
             //if pivot is the left son
-            if(has_left_son(pivot -> parent) && is_string_equal(pivot -> key, pivot->parent->left_son->key)) {
+            if(has_left_son(pivot -> parent) && strcmp(pivot -> key, pivot->parent->left_son->key) == 0) {
                 pivot->parent->left_son = a;
             }
 
@@ -246,7 +254,7 @@ void RB_insert_fixup(struct Node **Root, struct Node *new_node_ptr) {
                         node_uncle->color = black;
 
                         //if the grandparent is not the root
-                        if (!is_string_equal((node_parent->parent)->key, (*Root)->key)) {
+                        if (strcmp((node_parent->parent)->key, (*Root)->key) != 0) {
                             (node_parent->parent)->color = red;
                             //repeat on the grandparent
                             RB_insert_fixup(Root, node_parent->parent);
@@ -282,7 +290,7 @@ void RB_insert_fixup(struct Node **Root, struct Node *new_node_ptr) {
                     //if the uncle is red, CASE 1
                     node_parent->color = black;
                     node_uncle->color = black;
-                    if (!is_string_equal(node_parent->key, (*Root)->key)) {
+                    if (strcmp(node_parent->key, (*Root)->key) != 0) {
                         (node_parent->parent)->color = red;
                         //repeat on the grandparent
                         RB_insert_fixup(Root, node_parent->parent);
@@ -473,23 +481,44 @@ void RB_insert(struct Node **Root, struct Node* node_ptr) {
     RB_insert_fixup(Root, node_ptr);
 }
 
-void inserisci_inizio(struct Node **Root){
-    while(1) {
-        char *word = malloc(sizeof(char)*max(k, 17));
-        //read the word
-        if(scanf("%s", word) != 1) return;
-        //end the function if true
-        if (is_string_equal(word, "+inserisci_fine")) return;
+//turns off the nodes that do not respect the constraints and counts them in legal_word_counter
+void apply_constraints(struct Node *Root, const char *word, const char *result){
+    int C_hash_table_missing[64];
+    int C_hash_table_present[64];
 
-        struct Node *new_node = malloc(sizeof(struct Node));
-        create_leaf(new_node);
-        new_node -> valid = false;
-        new_node -> key = word;
 
-        RB_insert(Root, new_node);
+    for(int i = 0; i <64; i++) {
+        C_hash_table_missing[i] = 0;
+        C_hash_table_present[i] = 0;
     }
 
+    for(int i = k - 1; i >= 0; i--){
+        if(result[i] == '+'){
+            ITW_constraints_plus(Root, word[i], i);
+        }
+        else if(result[i] == '|'){
+            C_hash_table_present[hash_function_c(word[i])] += 1;
+            missing_letters[hash_function_c(word[i])] = false;
+            ITW_constraints_bar(Root, word[i], i);
+        }
+        else if(result[i] == '/'){
+            C_hash_table_missing[hash_function_c(word[i])] += 1;
+            missing_letters[hash_function_c(word[i])] = true;
+            ITW_constraints_slash(Root, word[i], i);
+        }
+    }
+
+    for(int i = 0; i < k; i++){
+        int missing = C_hash_table_missing[hash_function_c(word[i])];
+        int present =  C_hash_table_present[hash_function_c(word[i])];
+        if(result[i] == '|'){
+            ITW_letter_counter(Root, word[i], missing, present, result);
+        }
+        ITW_constraints(Root, C_hash_table_missing, C_hash_table_present, result);
+    }
 }
+
+
 
 int hash_function(int dim, char c){
     return (int)c % dim;
@@ -517,45 +546,93 @@ struct R_Node *get_hash_node(struct R_Node *hash, int hash_dimension, char c) {
     return iterate;
 }
 
-//turns off the nodes that do not respect the constraints and counts them in legal_word_counter
-void apply_constraints(struct Node *Root, const char *word, const char *result){
-    int C_hash_table_missing[64];
-    int C_hash_table_present[64];
 
-    for(int i = 0; i <64; i++) {
-        C_hash_table_missing[i] = 0;
-        C_hash_table_present[i] = 0;
+void inserisci_inizio(struct Node **Root1, struct Node **Root2, char *last_test, char* last_result){
+
+    //take a random valid word in the tree, it contains already most information about the selection
+
+    if(Root2 == NULL) {
+        while (1) {
+            char *word = malloc(sizeof(char) * max(k, 17));
+            //read the word
+            if (scanf("%s", word) != 1) return;
+            //end the function if true
+            if (strcmp(word, "+inserisci_fine") == 0) return;
+
+            struct Node *new_node = malloc(sizeof(struct Node));
+            create_leaf(new_node);
+
+            new_node->key = word;
+
+            apply_constraints(new_node, last_test, last_result);
+
+            for(int i = 0; i < k; i++){
+                if(missing_letters[hash_function_c(word[i])] == true){
+                    new_node -> valid = false;
+                }
+            }
+
+            RB_insert(Root1, new_node);
+        }
     }
+    else{
+        while (1) {
+            char *word = malloc(sizeof(char) * max(k, 17));
+            //read the word
+            if (scanf("%s", word) != 1) return;
+            //end the function if true
+            if (strcmp(word, "+inserisci_fine") == 0) return;
 
-    for(int i = 0; i <k; i++){
-        if(result[i] == '+'){
-            ITW_constraints_plus(Root, word[i], i);
-        }
-        else if(result[i] == '|'){
-            C_hash_table_present[hash_function_c(word[i])] += 1;
-            ITW_constraints_bar(Root, word[i], i);
-        }
-        else if(result[i] == '/'){
-            C_hash_table_missing[hash_function_c(word[i])] += 1;
-            ITW_constraints_slash(Root, word[i], i);
+            struct Node *new_node1 = malloc(sizeof(struct Node));
+            struct Node *new_node2 = malloc(sizeof(struct Node));
+
+            create_leaf(new_node1);
+            create_leaf(new_node2);
+
+            new_node1->key = word;
+            new_node2->key = word;
+
+            apply_constraints(new_node1, last_test, last_result);
+            apply_constraints(new_node2, last_test, last_result);
+
+
+            for(int i = 0; i < k; i++){
+                if(missing_letters[hash_function_c(word[i])] == true){
+                    new_node1-> valid = false;
+                    new_node2-> valid = false;
+                }
+            }
+
+
+            RB_insert(Root1, new_node1);
+            RB_insert(Root2, new_node2);
         }
     }
+}
 
-    for(int i = 0; i < k; i++){
-        int missing = C_hash_table_missing[hash_function_c(word[i])];
-        int present =  C_hash_table_present[hash_function_c(word[i])];
-        if(result[i] == '|'){
-            ITW_letter_counter(Root, word[i], missing, present, result);
+void build_selection_tree(struct Node *Root, struct Node **New_Tree){
+    if(Root != NULL) {
+        if (Root->valid == true) {
+            struct Node *new_node = malloc(sizeof(struct Node));
+            create_leaf(new_node);
+            new_node -> key = Root -> key;
+            RB_insert(New_Tree, new_node);
         }
-        ITW_constraints(Root, C_hash_table_missing, C_hash_table_present, result);
+        build_selection_tree(Root->left_son, New_Tree);
+        build_selection_tree(Root->right_son, New_Tree);
     }
+}
 
-
+void tree_destroy(struct Node *Root){
+    if(Root != NULL){
+        tree_destroy(Root -> left_son);
+        tree_destroy(Root -> right_son);
+        free(Root);
+    }
 }
 
 //Print the output of the word
-bool word_result(const char* reference_word, struct R_Node* hash, int hash_dimension, char *word, struct Node *Root){
-    char result[k];
+void word_result(const char* reference_word, struct R_Node* hash, int hash_dimension, char *word, struct Node *Root, char* result){
     struct R_Node hash_copy[hash_dimension];
 
     //initialize result and copy the hash table
@@ -603,39 +680,32 @@ bool word_result(const char* reference_word, struct R_Node* hash, int hash_dimen
         }
     }
 
-    bool found = true;
-
-    for(int i = 0; i < k; i++){
-        if(result[i] != '+') found = false;
-    }
-    if(!found) {
-        //print the result
-        for (int i = 0; i < k; i++) {
-            printf("%c", result[i]);
-        }
-        apply_constraints(Root, word, result);
-        legal_word_counter = 0;
-        inorder_tree_walk_counter(Root);
-        printf("\n%d", legal_word_counter);
-    }else{
-        printf("ok");
-    }
-    printf("\n");
-    return found;
-
 }
 
+
 int main() {
+
 
     //reading and storing part
     //read k
     if(scanf("%d", &k) != 1) return 0;
 
+    char last_test[k];
+    char last_result[k];
+
+    for(int i = 0; i < k; i++){
+        last_test[i] = '$';
+        last_result[i] = '$';
+    }
+
+
     //read and store words
-    
+
+
     //the tree is empty
     struct Node* ROOT = (struct Node*)malloc(sizeof(struct Node));
     create_leaf(ROOT);
+
 
     //IT IS ASSUMED THAT THE INSERTED WORDS ARE VALID
     while(1){
@@ -643,7 +713,7 @@ int main() {
         if(scanf("%s", word) != 1) return 0;
 
         //start the game if true
-        if(is_string_equal(word, "+nuova_partita")) break;
+        if(strcmp(word, "+nuova_partita") == 0) break;
 
         struct Node *new_node_ptr = (struct Node*)malloc(sizeof(struct Node));
         create_leaf(new_node_ptr);
@@ -657,6 +727,11 @@ int main() {
 
 
     while(1) {
+
+        //this tree is used when the words are excluded
+        struct Node* Selection_TREE = (struct Node*)malloc(sizeof(struct Node));
+        create_leaf(Selection_TREE);
+
         //read reference word
         char *R_word = malloc(sizeof(char) * k);
         if (scanf("%s", R_word) != 1) return 0;
@@ -705,32 +780,116 @@ int main() {
         if (scanf("%d", &n) != 1) return 0;
 
         //read word p - note exceptions +inserisci_inizio +stampa_filtrate
-        bool found = false;
         i = 0;
+
+        bool found = true;
         while (i < n) {
+
             char *word = malloc(sizeof(char) * max(k, 17));
+            char result[k];
             if (scanf("%s", word) != 1) return 0;
 
-            //exception +inserisci_inizio
-            if (is_string_equal(word, "+inserisci_inizio")) {
-                inserisci_inizio(&ROOT);
-                i -= 1;
-            }
-            //exception +stampa_filtrate
-            else if (is_string_equal(word, "+stampa_filtrate")) {
-                stampa_filtrate(ROOT);
-                i -= 1;
-            } else {
-                if (is_string_valid(ROOT, word)) {
-                    //word result returns true if the word was found
-                    found = word_result(R_word, R_Hash_table, hash_dimension, word, ROOT);
-                    if (found) break;
+            if (i == 0) {
+
+                //exception +inserisci_inizio
+                if (strcmp(word, "+inserisci_inizio") == 0) {
+                    inserisci_inizio(&ROOT, NULL, last_test, last_result);
+                    continue;
+                }
+                //exception +stampa_filtrate
+                else if (strcmp(word, "+stampa_filtrate") == 0) {
+                    stampa_filtrate(ROOT);
+                    continue;
                 } else {
-                    printf("not_exists\n");
-                    i -= 1;
+                    if (is_string_present(ROOT, word)) {
+                        if(is_string_valid(ROOT, word)) strcpy(last_test,word);
+                        //word result returns true if the word was found
+                        word_result(R_word, R_Hash_table, hash_dimension, word, ROOT, result);
+
+                        found = true;
+                        for(int j = 0; j < k; j++){
+                            if(result[j] != '+') found = false;
+                        }
+                        if(!found) {
+
+                            //print the result
+                            for(int j = 0; j < k; j++) {
+                                printf("%c", result[j]);
+                            }
+
+                            apply_constraints(ROOT, word, result);
+                            legal_word_counter = 0;
+                            inorder_tree_walk_counter(ROOT);
+                            printf("\n%d", legal_word_counter);
+                        }else{
+                            printf("ok");
+                        }
+                        printf("\n");
+
+                        if (found) break;
+                    } else {
+                        printf("not_exists\n");
+                        continue;
+                    }
+                }
+
+                build_selection_tree(ROOT, &Selection_TREE);
+            }
+            else {
+
+                //exception +inserisci_inizio
+                if (strcmp(word, "+inserisci_inizio") == 0) {
+                    inserisci_inizio(&ROOT, &Selection_TREE, last_test, last_result);
+                    continue;
+                }
+                //exception +stampa_filtrate
+                if (strcmp(word, "+stampa_filtrate") == 0) {
+                    stampa_filtrate(Selection_TREE);
+                    continue;
+                } else {
+                    if (is_string_present(ROOT, word)) {
+                        if(!is_string_present(Selection_TREE, word)){
+                            struct Node *new_node = malloc(sizeof(struct Node));
+                            create_leaf(new_node);
+                            new_node -> key = word;
+                            RB_insert(&Selection_TREE, new_node);
+                        }
+                        //word result returns true if the word was found
+                        word_result(R_word, R_Hash_table, hash_dimension, word, Selection_TREE, result);
+
+                        if(is_string_valid(Selection_TREE, word)) {
+                            strcpy(last_test,word);
+                            strcpy(last_result, result);
+                        }
+
+                        found = true;
+                        for(int j = 0; j < k; j++){
+                            if(result[j] != '+') found = false;
+                        }
+                        if(!found) {
+
+                            //print the result
+                            for(int j = 0; j < k; j++) {
+                                printf("%c", result[j]);
+                            }
+
+                            apply_constraints(Selection_TREE, word, result);
+                            legal_word_counter = 0;
+                            inorder_tree_walk_counter(Selection_TREE);
+                            printf("\n%d", legal_word_counter);
+                        }else{
+                            printf("ok");
+                        }
+                        printf("\n");
+
+                        if (found) break;
+
+                    } else {
+                        printf("not_exists\n");
+                        continue;
+                    }
                 }
             }
-
             i += 1;
         }
         //print ko
@@ -738,13 +897,18 @@ int main() {
             printf("ko\n");
         }
 
+        tree_destroy(Selection_TREE);
+        for(int j = 0; j < 64; j++) {
+            missing_letters[j] = false;
+        }
+
         while(1){
             char *game_starter = malloc(sizeof(char) * 17);
             if (scanf("%s", game_starter) != 1) return 0;
-            if(is_string_equal(game_starter, "+inserisci_inizio")){
-                inserisci_inizio(&ROOT);
+            if(strcmp(game_starter, "+inserisci_inizio") == 0){
+                inserisci_inizio(&ROOT, NULL, last_test, last_result);
             }
-            else if(is_string_equal(game_starter, "+nuova_partita")) {
+            else if(strcmp(game_starter, "+nuova_partita") == 0) {
                 reset_valid(ROOT);
                 break;
             }
