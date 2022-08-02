@@ -178,7 +178,7 @@ void right_rotate(struct Node **Root, struct Node* pivot){
 
     }
 
-    //here the pivot is the Root, that means the Root has to change
+        //here the pivot is the Root, that means the Root has to change
     else{
 
         if(has_left_son(pivot)){
@@ -340,39 +340,24 @@ void reset_valid(struct Node *Root){
     }
 }
 
-//inorder tree walk to apply the + constraint
-void ITW_constraints_plus(struct Node *Root, const char c, int i){
-    if(Root != NULL) {
-        ITW_constraints_plus(Root->left_son, c, i);
-        if(Root -> valid == true) {
-            if (c != (Root->key)[i]) {
-                Root->valid = false;
+void ITW_constraints1(struct Node *Root, const char *word, const char* result){
+    if(Root == NULL) return;
+
+    ITW_constraints1(Root -> left_son, word, result);
+    if(Root -> valid == true){
+        for(int i = k - 1; i >= 0; i--) {
+            if (result[i] == '+') {
+                if (word[i] != (Root->key)[i]) {
+                    Root->valid = false;
+                }
+            } else{
+                if ((Root->key)[i] == word[i]) {
+                    Root->valid = false;
+                }
             }
         }
-        ITW_constraints_plus(Root->right_son, c, i);
     }
-}
-
-void ITW_constraints_bar(struct Node *Root, char c, int i){
-    if(Root != NULL) {
-        ITW_constraints_bar(Root->left_son, c,i);
-        if(Root->valid == true) {
-            if((Root -> key)[i] == c){
-                Root -> valid = false;
-            }
-        }
-        ITW_constraints_bar(Root->right_son, c, i);
-    }
-}
-
-void ITW_constraints_slash(struct Node *Root, char c, int i){
-    if(Root != NULL) {
-        ITW_constraints_slash(Root->left_son, c, i);
-        if (Root->valid == true && (Root -> key)[i] == c) {
-            Root -> valid = false;
-        }
-        ITW_constraints_slash(Root->right_son, c, i);
-    }
+    ITW_constraints1(Root -> right_son, word, result);
 }
 
 void ITW_letter_counter(struct Node *Root, char c, int missing, int present, const char *result){
@@ -402,9 +387,9 @@ void ITW_letter_counter(struct Node *Root, char c, int missing, int present, con
     }
 }
 
-void ITW_constraints(struct Node *Root, int *C_hash_table_missing, int *C_hash_table_present, const char *result){
+void ITW_constraints2(struct Node *Root, int *C_hash_table_missing, int *C_hash_table_present, const char *result){
     if(Root != NULL) {
-        ITW_constraints(Root->left_son, C_hash_table_missing, C_hash_table_present, result);
+        ITW_constraints2(Root->left_son, C_hash_table_missing, C_hash_table_present, result);
         if((Root -> valid) == true) {
 
             for(int i = 0; i < k; i++){
@@ -418,7 +403,7 @@ void ITW_constraints(struct Node *Root, int *C_hash_table_missing, int *C_hash_t
                 }
             }
         }
-        ITW_constraints(Root->right_son, C_hash_table_missing, C_hash_table_present, result);
+        ITW_constraints2(Root->right_son, C_hash_table_missing, C_hash_table_present, result);
     }
 }
 
@@ -453,7 +438,7 @@ void RB_insert(struct Node **Root, struct Node* node_ptr) {
     if (strcmp(node_ptr -> key, iterate -> key) > 0)
         iterate -> right_son = node_ptr;
 
-    // insert left if smaller
+        // insert left if smaller
     else
         iterate -> left_son = node_ptr;
 
@@ -472,22 +457,18 @@ void apply_constraints(struct Node *Root, const char *word, const char *result){
         C_hash_table_missing[i] = 0;
         C_hash_table_present[i] = 0;
     }
-
-    for(int i = k - 1; i >= 0; i--){
-        if(result[i] == '+'){
-            ITW_constraints_plus(Root, word[i], i);
-        }
-        else if(result[i] == '|'){
+    for(int i = k - 1; i >= 0; i--) {
+        if (result[i] == '|') {
             C_hash_table_present[hash_function_c(word[i])] += 1;
             missing_letters[hash_function_c(word[i])] = false;
-            ITW_constraints_bar(Root, word[i], i);
-        }
-        else if(result[i] == '/'){
+
+        } else if (result[i] == '/') {
             C_hash_table_missing[hash_function_c(word[i])] += 1;
             missing_letters[hash_function_c(word[i])] = true;
-            ITW_constraints_slash(Root, word[i], i);
         }
     }
+
+    ITW_constraints1(Root, word, result);
 
     for(int i = 0; i < k; i++){
         int missing = C_hash_table_missing[hash_function_c(word[i])];
@@ -495,10 +476,9 @@ void apply_constraints(struct Node *Root, const char *word, const char *result){
         if(result[i] == '|'){
             ITW_letter_counter(Root, word[i], missing, present, result);
         }
-        ITW_constraints(Root, C_hash_table_missing, C_hash_table_present, result);
+        ITW_constraints2(Root, C_hash_table_missing, C_hash_table_present, result);
     }
 }
-
 
 
 int hash_function(int dim, char c){
@@ -786,7 +766,7 @@ int main() {
                     inserisci_inizio(&ROOT, NULL, last_test, last_result, true);
                     continue;
                 }
-                //exception +stampa_filtrate
+                    //exception +stampa_filtrate
                 else if (strcmp(word1, "+stampa_filtrate") == 0) {
                     stampa_filtrate(ROOT);
                     continue;
@@ -938,4 +918,3 @@ int main() {
 
     }
 }
-
