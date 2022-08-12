@@ -38,7 +38,8 @@ struct R_Node{
 };
 
 int n, legal_word_counter;
-unsigned char x, t, k;
+unsigned char x, t;
+int k;
 unsigned long hash_dimension = 0;
 
 //information that the user have about the number of letters in the reference word
@@ -74,7 +75,12 @@ void TreeVisitPlusConstraint(struct Node *Root, char letter, int position);
 void TreeVisitBarConstraint(struct Node *Root, char letter, int position);
 void TreeVisitCounterConstraint(struct Node *Root, char letter, int position, bool isExact);
 void TreeVisitSlashConstraint(struct Node *Root, char letter);
-void reset_valid(struct hashNode *HashTable);
+void reset_valid(struct hashNode *HashTable, struct iterationList **IListHead, struct iterationList **IListTail);
+void reset_tree(struct Node *Root);
+void destroyList(struct iterationList **IListHead, struct iterationList **IListTail);
+void inserisciInizio(struct hashNode *HashTable, struct iterationList **IListHead, struct iterationList **IListTail, char (*positionInformation)[64], bool need_constraints);
+void invalidateTree(struct Node *Root);
+void listInsert(unsigned long index, struct iterationList **IListHead,struct iterationList **IListTail);
 
 int max(int n1, int n2){
     if(n1 > n2) return n1;
@@ -384,22 +390,6 @@ int lett_number(char c){
     else return -1;
 }
 
-/*
-char inv_lett_number(int num){
-    if(num == 0)
-        return '-';
-    else if(1 <= num && num <= 10)
-        return (char)(47 + num);
-    else if(11 <= num && num <= 36)
-        return (char)(54 + num);
-    else if(37 <= num && num <= 62)
-        return (char)(60 + num);
-    else if(num == 63)
-        return '_';
-    return 0;
-}
- */
-
 void append(unsigned long i, struct iterationList **Tail, struct iterationList **Head){
     struct iterationList *new = malloc(sizeof(struct iterationList));
     new -> index = i;
@@ -650,6 +640,9 @@ void apply_constraints(struct hashNode *HashTable, struct iterationList **INodeH
                 iterate = iterate->next;
 
             }
+
+            positionInformation[i][lett_number(word[i])] = '/';
+
         }
         i++;
     }
@@ -701,15 +694,25 @@ void apply_constraints(struct hashNode *HashTable, struct iterationList **INodeH
     for(int j = 0; j < k; j++){
         if(result[j] == '|' || result[j] == '+'){
             temporaryCounter[lett_number(word[j])]++;
-        } else if(result[j] == '/' && temporaryCounter[lett_number(word[j])] > 0){
+        }
+    }
+
+    bool prev_exact_num[64];
+    for(short j = 0; j < 64; j++){
+        prev_exact_num[j] = exact_num[j];
+    }
+
+    for(int j = 0; j < k; j++) {
+
+        if (result[j] == '/' && temporaryCounter[lett_number(word[j])] > 0) {
             exact_num[lett_number(word[j])] = true;
-        } else if(result[j] == '/' && temporaryCounter[lett_number(word[j])] == 0){
+        } else if (result[j] == '/' && temporaryCounter[lett_number(word[j])] == 0) {
 
             struct iterationList *iterate = *INodeHead;
 
-            while(iterate != NULL){
-                TreeVisitSlashConstraint(HashTable[iterate -> index].Tree, word[j]);
-                iterate = iterate -> next;
+            while (iterate != NULL) {
+                TreeVisitSlashConstraint(HashTable[iterate->index].Tree, word[j]);
+                iterate = iterate->next;
             }
 
         }
@@ -717,7 +720,7 @@ void apply_constraints(struct hashNode *HashTable, struct iterationList **INodeH
 
     for(int j = 0; j < k; j++){
         int lett_num = lett_number(word[j]);
-        if(result[j] == '|' && temporaryCounter[lett_num] > lett_count[lett_num]){
+        if((result[j] == '|' || result[j] == '+') && (temporaryCounter[lett_num] > lett_count[lett_num] || exact_num[lett_num] != prev_exact_num[lett_num])){
             lett_count[lett_num] = temporaryCounter[lett_num];
 
             struct iterationList *iterate = *INodeHead;
@@ -765,11 +768,13 @@ void countTreeNodes(struct Node *Root) {
 }
 
 void nodeRemove(struct iterationList *nodeToBeDeleted, struct iterationList *prev, struct iterationList **Head, struct iterationList **Tail){
-
-    if(nodeToBeDeleted == *Head){
+    if(nodeToBeDeleted == *Head && nodeToBeDeleted == *Tail){
+        free(nodeToBeDeleted);
+        *Head = *Tail = NULL;
+    }else if(nodeToBeDeleted == *Head){
         *Head = nodeToBeDeleted->next;
         free(nodeToBeDeleted);
-    } else if(nodeToBeDeleted == *Tail){
+    } else if(prev != NULL && nodeToBeDeleted == *Tail){
         *Tail = prev;
         prev -> next = NULL;
         free(nodeToBeDeleted);
@@ -847,15 +852,121 @@ void TreeVisitSlashConstraint(struct Node *Root, char letter){
     }
 }
 
-void reset_valid(struct hashNode *HashTable, struct iterationList *IListHead, struct iterationList *IListTail){
+void reset_valid(struct hashNode *HashTable, struct iterationList **IListHead, struct iterationList **IListTail){
     for(int i = 0; i < hash_dimension; i++){
         if(HashTable[i].Tree != NULL){
-            append(i, &IListTail, &IListHead);
+            append(i, IListTail, IListHead);
             HashTable[i].shadow_tree = false;
-            reset_tree(&HashTable[i].Tree);
+            reset_tree(HashTable[i].Tree);
         }
     }
 }
+
+void reset_tree(struct Node *Root){
+    if(Root != NULL) {
+        reset_tree(Root->left_son);
+        Root -> valid = true;
+        reset_tree(Root->right_son);
+    }
+}
+
+void destroyList(struct iterationList **IListHead, struct iterationList **IListTail){
+    struct iterationList *iterate = *IListHead;
+    while(iterate != NULL){
+        struct iterationList *next = iterate -> next;
+        nodeRemove(iterate, NULL, IListHead, IListTail);
+        iterate = next;
+    }
+}
+
+void inserisciInizio(struct hashNode *HashTable, struct iterationList **IListHead, struct iterationList **IListTail, char (*positionInformation)[64], bool need_constraints){
+    while (1) {
+        char *word1 = malloc(sizeof(char) * max(k, 17));
+        char *word = malloc(sizeof(char)*k);
+        //read the word
+        if (scanf("%s", word1) != 1) return;
+        //end the function if true
+        if (strcmp(word1, "+inserisci_fine") == 0) return;
+
+        strcpy(word, word1);
+
+        struct Node *new_node = malloc(sizeof(struct Node));
+        create_leaf(new_node);
+        new_node->key = word;
+
+        bool isWordValid = true;
+        short count[64];
+
+        for(int i = 0; i < 64; i++){
+            count[i] = 0;
+        }
+
+        if(need_constraints) {
+            //apply_constraints
+            for (int i = 0; i < k; i++) {
+                if(positionInformation[i][lett_number(word[i])] == '/'){
+                    new_node -> valid = false;
+                    isWordValid = false;
+                }else {
+                    count[lett_number(word[i])]++;
+                }
+            }
+
+            for (int i = 0; i < k; i++) {
+                int num = lett_number(word[i]);
+                if(count[num] < lett_count[num]){
+                    new_node -> valid = false;
+                    isWordValid = false;
+                }else if(count[num] != lett_count[num] && exact_num[num] == true){
+                    new_node -> valid = false;
+                    isWordValid = false;
+                }
+            }
+
+        }
+
+        if(HashTable[hash_function(word)].shadow_tree == true && isWordValid){
+            invalidateTree(HashTable[hash_function(word)].Tree);
+            HashTable[hash_function(word)].shadow_tree = false;
+            listInsert(hash_function(word), IListHead, IListTail);
+        }
+        RB_insert(&HashTable[hash_function(word)], new_node);
+    }
+}
+
+void invalidateTree(struct Node *Root){
+    if(Root != NULL){
+        invalidateTree(Root -> left_son);
+        Root -> valid = false;
+        invalidateTree(Root -> right_son);
+    }
+}
+
+void listInsert(unsigned long index, struct iterationList **IListHead,struct iterationList **IListTail){
+    struct iterationList *iterate = *IListHead;
+    struct iterationList *new_node = malloc(sizeof(struct iterationList));
+    new_node -> index = index;
+    new_node -> next = NULL;
+
+    while(iterate != NULL){
+        if(iterate == *IListHead && iterate -> index > index){
+            *IListHead = new_node;
+            new_node -> next = iterate;
+            break;
+        } else if(iterate == *IListTail && iterate -> index < index){
+            *IListTail = new_node;
+            iterate -> next = new_node;
+        } else if(iterate -> index < index && iterate -> next -> index > index ){
+
+            struct iterationList *nextTemp = iterate -> next;
+            iterate -> next = new_node;
+            new_node -> next = nextTemp;
+            break;
+        }
+        iterate = iterate -> next;
+    }
+}
+
 
 
 
@@ -864,16 +975,7 @@ int main() {
     //reading and storing part
     //read k
     if(scanf("%d", &k) != 1) return 0;
-
-    //used to apply constraints to the +inserisci_inizio words
-    char last_test[k];
-    char last_result[k];
-
-    for(int i = 0; i < k; i++){
-        last_test[i] = '$';
-        last_result[i] = '$';
-    }
-
+    
     //read and store words
 
     //temporary list necessary to store words before inserting them in the hash table
@@ -1034,7 +1136,7 @@ int main() {
             if (scanf("%s", word1) != 1) return 0;
 
             if (strcmp(word1, "+inserisci_inizio") == 0) {
-                //inserisci_inizio(...);
+                inserisciInizio(HashTable, &IListHead, &IListTail, positionInformation, true);
                 continue;
             }else if (strcmp(word1, "+stampa_filtrate") == 0) {
                 stampa_filtrate(HashTable, IListHead);
@@ -1046,11 +1148,6 @@ int main() {
 
                 if(is_string_present(HashTable, word)){
                     word_result(R_word, R_Hash_table, R_hash_dimension, word, result);
-
-                    if(is_string_valid(HashTable, word)) {
-                        strcpy(last_test,word);
-                        strcpy(last_result, result);
-                    }
 
                     found = true;
                     for(int j = 0; j < k; j++){
@@ -1094,12 +1191,12 @@ int main() {
             if (scanf("%s", game_starter) != 1) return 0;
 
             if(strcmp(game_starter, "+inserisci_inizio") == 0){
-                //inserisci_inizio(...);
+                inserisciInizio(HashTable, &IListHead, &IListTail, positionInformation, false);
             }
             else if(strcmp(game_starter, "+nuova_partita") == 0) {
-                destroyList(IListHead, IListTail);
+                destroyList(&IListHead, &IListTail);
                 //it also rebuilds the list
-                reset_valid(HashTable, IListHead, IListTail);
+                reset_valid(HashTable, &IListHead, &IListTail);
 
                 for(int j = 0; j < 64; j++) {
                     exact_num[j] = false;
