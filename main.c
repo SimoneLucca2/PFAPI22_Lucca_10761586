@@ -43,9 +43,6 @@ int R_hash_function(int dim, char c);
 bool is_in_R_hash_table(struct R_Node *hash, int R_hash_dimension, char c);
 struct R_Node *get_hash_node(struct R_Node *hash, unsigned char R_hash_dimension, char c);
 void nodeRemove(struct iterationList *nodeToBeDeleted, struct iterationList *prev, struct iterationList **Head, struct iterationList **Tail);
-void TreeVisitPlusConstraint(struct Node *Root, char letter, int position);
-void TreeVisitBarConstraint(struct Node *Root, char letter, int position);
-void TreeVisitSlashConstraint(struct Node *Root, char letter);
 void wordResult(const char* reference_word, struct R_Node* hash, int R_hash_dimension, char *word, char* result);
 
 
@@ -478,121 +475,59 @@ void nodeRemove(struct iterationList *nodeToBeDeleted, struct iterationList *pre
     }
 }
 
-void TreeVisitPlusConstraint(struct Node *Root, char letter, int position){
-    if(Root != NULL){
-        TreeVisitPlusConstraint(Root -> left_son, letter, position);
-        if(Root -> valid == true){
-            if((Root -> key)[position] != letter){
-                Root -> valid = false;
+void CountConstraints(struct Node *currentNode, const short *countConstraintsIndexes){
+    //here the node is valid
+    short i = 0;
+    while(countConstraintsIndexes[i] != (short)INFINITY){
+        short count = 0;
+        for(short j = 0; j < k; j++){
+            if(lett_number((currentNode -> key)[j]) == countConstraintsIndexes[i]){
+                count++;
             }
         }
-        TreeVisitPlusConstraint(Root -> right_son, letter, position);
+
+        short expected = (short)lett_count[countConstraintsIndexes[i]];
+        if(expected <= 0 && count != abs(expected)){
+            currentNode -> valid = false;
+        }else if(expected > 0 && count < expected){
+            currentNode -> valid = false;
+        }
+        i++;
     }
 }
 
-void TreeVisitBarConstraint(struct Node *Root, char letter, int position){
+void TreeVisitConstraints(struct Node *Root, const char *word, const char* result,short *indexArray, short *countConstraintsIndexes){
     if(Root != NULL){
-        TreeVisitBarConstraint(Root -> left_son, letter, position);
-        if(Root -> valid == true){
-            if((Root -> key)[position] == letter){
-                Root -> valid = false;
-            }
-        }
-        TreeVisitBarConstraint(Root -> right_son, letter, position);
-    }
-}
-
-void TreeVisitSlashConstraint(struct Node *Root, char letter){
-    if(Root != NULL) {
-        TreeVisitSlashConstraint(Root->left_son, letter);
-        if(Root -> valid == true){
-            for(int i = 0; i < k; i++){
-                if((Root -> key)[i] == letter){
-                    Root -> valid = false;
-                    break;
-                }
-            }
-        }
-        TreeVisitSlashConstraint(Root->right_son, letter);
-    }
-}
-
-void TreeVisitCounterConstraint(struct Node *Root, char letter, int position, bool isExact){
-    if(Root != NULL){
-        TreeVisitCounterConstraint(Root -> left_son, letter, position, isExact);
         if(Root -> valid == true){
 
-            short count = 0;
-            for(int i = 0; i < k; i++){
-                if((Root -> key)[i] == letter){
-                    count++;
-                }
-            }
-            if(isExact){
-                //if the node contains a different number of word[j] letter than lett_count[lett_num] => valid = false
-                if(count != abs(lett_count[lett_number(letter)])){
-                    Root -> valid = false;
-                }
-            }else{
-                //if the node contains less word[j] letter than lett_count[lett_num] => valid = false
-                if(count < abs(lett_count[lett_number(letter)])){
-                    Root -> valid = false;
-                }
-            }
-        }
-        TreeVisitCounterConstraint(Root -> right_son, letter, position, isExact);
-    }
-}
-
-void PositionalConstraints(struct Node *Root, const char *word, const char* result,short *indexArray){
-    if(Root != NULL){
-        PositionalConstraints(Root -> left_son, word, result, indexArray);
-        if(Root -> valid == true){
                short i = 0;
-               if(indexArray[i] > 1) {
-                   while (indexArray[i] != (short) INFINITY) {
-                       if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
-                           (Root->key)[indexArray[i]] == word[indexArray[i]]) {
-                           Root->valid = false;
-                           break;
-                       }else if(result[indexArray[i]] == '+' && (Root->key)[indexArray[i]] != word[indexArray[i]]){
-                           Root->valid = false;
-                           break;
-                       }
-                       i++;
+               while(indexArray[i] <= 1) i++;
+               bool dontDo = false;
+
+               while (indexArray[i] != (short) INFINITY) {
+                   if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
+                       (Root->key)[indexArray[i]] == word[indexArray[i]]) {
+                       Root->valid = false;
+                       dontDo = true;
+                       break;
+                   }else if(result[indexArray[i]] == '+' && (Root->key)[indexArray[i]] != word[indexArray[i]]){
+                       Root->valid = false;
+                       dontDo = true;
+                       break;
                    }
+                   i++;
                }
+               if(dontDo == false) {
+                   CountConstraints(Root, countConstraintsIndexes);
+               }
+
         }
-        PositionalConstraints(Root -> right_son, word, result, indexArray);
+        TreeVisitConstraints(Root -> left_son, word, result, indexArray, countConstraintsIndexes);
+        TreeVisitConstraints(Root -> right_son, word, result, indexArray, countConstraintsIndexes);
     }
 }
 
-void CountConstraints(struct Node *Root, short *countConstraintsIndexes){
-    if(Root != NULL){
-        CountConstraints(Root -> left_son, countConstraintsIndexes);
-        if(Root -> valid == true){
-            short i = 0;
-            while(countConstraintsIndexes[i] != (short)INFINITY){
-                short count = 0;
-                for(short j = 0; j < k; j++){
-                    if(lett_number((Root -> key)[j]) == countConstraintsIndexes[i]){
-                        count++;
-                    }
-                }
 
-                short expected = (short)lett_count[countConstraintsIndexes[i]];
-                if(expected <= 0 && count != abs(expected)){
-                    Root -> valid = false;
-                }else if(expected > 0 && count < expected){
-                    Root -> valid = false;
-                }
-
-                i++;
-            }
-        }
-        CountConstraints(Root -> right_son, countConstraintsIndexes);
-    }
-}
 
 void applyConstraints(struct Node *(HashTable[64][64]), struct iterationList **INodeHead, struct iterationList **INodeTail,
                       char (*positionInformation)[64],char *word, const char* result){
@@ -659,21 +594,17 @@ void applyConstraints(struct Node *(HashTable[64][64]), struct iterationList **I
             lett_count[countConstraintsIndexes[u]] = temporaryCount[countConstraintsIndexes[u]];
             countConstraintsIndexes[tempIndex] = countConstraintsIndexes[u];
             tempIndex++;
-            u++;
         } else if(temporaryCount[countConstraintsIndexes[u]] > 0 && lett_count[countConstraintsIndexes[u]] > 0
                     && temporaryCount[countConstraintsIndexes[u]] > lett_count[countConstraintsIndexes[u]]){
             lett_count[countConstraintsIndexes[u]] = temporaryCount[countConstraintsIndexes[u]];
             countConstraintsIndexes[tempIndex] = countConstraintsIndexes[u];
             tempIndex ++;
-            u++;
         }else if(lett_count[countConstraintsIndexes[u]] + temporaryCount[countConstraintsIndexes[u]] == 0 && temporaryCount[countConstraintsIndexes[u]] < 0){
             lett_count[countConstraintsIndexes[u]] = temporaryCount[countConstraintsIndexes[u]];
             countConstraintsIndexes[tempIndex] = countConstraintsIndexes[u];
             tempIndex ++;
-            u++;
-        }else{
-            u++;
         }
+        u++;
     }
 
     countConstraintsIndexes[tempIndex] = (short)INFINITY;
@@ -682,6 +613,7 @@ void applyConstraints(struct Node *(HashTable[64][64]), struct iterationList **I
     short indexArray[k+1];
 
     tempIndex = 0;
+    short lastPlus = 0;
     for(short i = 0; i < k; i++){
 
         short CurrentLettNum = (short)lett_number(word[i]);
@@ -690,11 +622,22 @@ void applyConstraints(struct Node *(HashTable[64][64]), struct iterationList **I
             indexArray[tempIndex] = i;
             tempIndex++;
 
+            //indexArray is made like this: {0, 1, indexes of +, other indexes, INFINITY, ... }
+            if(i == 0 || i == 1) lastPlus++;
+
             positionInformation[i][CurrentLettNum] = '/';
 
         }else if(result[i] == '+' && positionInformation[i][CurrentLettNum] != '+'){
-            indexArray[tempIndex] = i;
+            if(lastPlus != tempIndex){
+                short temp = indexArray[lastPlus];
+                indexArray[lastPlus] = i;
+                indexArray[tempIndex] = temp;
+            }else{
+                indexArray[tempIndex] = i;
+            }
+
             tempIndex++;
+            lastPlus++;
 
             //set all the other char in positionInformation[i] as '/'
             for(int j = 0; j < 64; j++){
@@ -716,36 +659,37 @@ void applyConstraints(struct Node *(HashTable[64][64]), struct iterationList **I
 
     struct iterationList *iterate = *INodeHead;
     struct iterationList *prev = NULL;
+
+    //go through the list
     while(iterate != NULL){
         short i = 0;
-        while(indexArray[i] != (short)INFINITY){
 
+        while(indexArray[i] <= 1) {
             if(iterate == NULL) return;
 
-            if(indexArray[i] <= 1){
-                if((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') && (HashTable[iterate -> i][iterate -> j] -> key)[indexArray[i]] == word[indexArray[i]]){
-                    struct iterationList *next = iterate -> next;
-                    nodeRemove(iterate, prev, INodeHead, INodeTail);
-                    iterate = next;
-                    continue;
-                }else if(result[indexArray[i]] == '+' && (HashTable[iterate -> i][iterate -> j] -> key)[indexArray[i]] != word[indexArray[i]]){
-                    struct iterationList *next = iterate -> next;
-                    nodeRemove(iterate, prev, INodeHead, INodeTail);
-                    iterate = next;
-                    continue;
-                }
-            } else{
-                PositionalConstraints(HashTable[iterate -> i][iterate -> j], word, result, indexArray) ;
+            struct iterationList *next = iterate -> next;
+
+            if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
+                (HashTable[iterate->i][iterate->j]->key)[indexArray[i]] == word[indexArray[i]]) {
+                nodeRemove(iterate, prev, INodeHead, INodeTail);
+                iterate = next;
+                i = 0;
+                continue;
+            } else if (result[indexArray[i]] == '+' &&
+                       (HashTable[iterate->i][iterate->j]->key)[indexArray[i]] != word[indexArray[i]]) {
+                nodeRemove(iterate, prev, INodeHead, INodeTail);
+                iterate = next;
+                i = 0;
+                continue;
             }
             i++;
         }
 
-        CountConstraints(HashTable[iterate -> i][iterate -> j], countConstraintsIndexes);
+        TreeVisitConstraints(HashTable[iterate -> i][iterate -> j], word, result, indexArray, countConstraintsIndexes) ;
 
         prev = iterate;
         iterate = iterate -> next;
     }
-
 }
 
 void countTreeNodes(struct Node *Root) {
@@ -808,6 +752,53 @@ void stampaFiltrate(struct Node *(HashTable[64][64]), struct iterationList *Head
     }
 }
 
+void listInsert(short i, short j, struct iterationList **IListHead,struct iterationList **IListTail){
+    struct iterationList *iterate = *IListHead;
+    struct iterationList *new_node = malloc(sizeof(struct iterationList));
+    new_node -> i = i;
+    new_node -> j = j;
+    new_node -> next = NULL;
+
+    while(iterate != NULL){
+        if(iterate == *IListHead){
+            if(iterate -> i > i){
+                *IListHead = new_node;
+                new_node -> next = iterate;
+                break;
+            }else if(iterate -> i == i && iterate -> j > j){
+                *IListHead = new_node;
+                new_node -> next = iterate;
+                break;
+            }
+
+        } else if(iterate == *IListTail){
+            if(iterate -> i < i){
+                *IListTail = new_node;
+                iterate -> next = new_node;
+                break;
+            } else if(iterate -> i == i && iterate -> j < j){
+                *IListTail = new_node;
+                iterate -> next = new_node;
+                break;
+            }
+
+        } else if(iterate -> i >= i && iterate -> next -> i <= i){
+            if(iterate -> i == iterate -> next -> i && iterate -> j < j){
+                struct iterationList *nextTemp = iterate -> next;
+                iterate -> next = new_node;
+                new_node -> next = nextTemp;
+                break;
+            }else if(iterate -> i < iterate -> next -> i){
+                struct iterationList *nextTemp = iterate -> next;
+                iterate -> next = new_node;
+                new_node -> next = nextTemp;
+                break;
+            }
+        }
+        iterate = iterate -> next;
+    }
+}
+
 void inserisciInizio(struct Node *(HashTable[64][64]), struct iterationList **IListHead, struct iterationList **IListTail, char (*positionInformation)[64], bool need_constraints){
 
     while (1) {
@@ -858,7 +849,7 @@ void inserisciInizio(struct Node *(HashTable[64][64]), struct iterationList **IL
         }
 
         if(isWordValid && !isNodeInIList(IListHead, lett_number(word[0]), lett_number(word[1]))){
-            append((short)lett_number(word[0]), (short)lett_number(word[1]), IListHead, IListTail);
+            listInsert((short)lett_number(word[0]), (short)lett_number(word[1]), IListHead, IListTail);
         }
         MatrixInsert(HashTable, word);
     }
@@ -885,8 +876,8 @@ void resetList(struct iterationList **IListHead, struct iterationList **IListTai
 
 void resetValidTree(struct Node *Root){
     if(Root != NULL) {
-        resetValidTree(Root->left_son);
         Root -> valid = true;
+        resetValidTree(Root->left_son);
         resetValidTree(Root->right_son);
     }
 }
