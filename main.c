@@ -29,6 +29,7 @@ struct R_Node{
 };
 
 int n, legalWordCounter, k;
+char buffer[17];
 
 //information that the user have about the number of letters in the reference word
 short lett_count[64];
@@ -46,6 +47,7 @@ void nodeRemove(struct iterationList *nodeToBeDeleted, struct iterationList *pre
 void wordResult(const char* reference_word, struct R_Node* hash, int R_hash_dimension, char *word, char* result);
 
 
+
 int lett_number(char c){
     if(c == '-')
         return 0;
@@ -53,10 +55,10 @@ int lett_number(char c){
         return (int)c - (int)'0' + 1;
     else if('A' <= c && c <= 'Z')
         return (int)c - (int)'A' + (int)'9' - (int)'0' + 2;
-    else if('a' <= c && c <= 'z')
-        return (int)c - (int)'a' + 37;
     else if(c == '_')
-        return 63;
+        return 37;
+    else if('a' <= c && c <= 'z')
+        return (int)c - (int)'a' + 38;
     else return -1;
 }
 
@@ -758,42 +760,25 @@ void listInsert(short i, short j, struct iterationList **IListHead,struct iterat
     new_node -> i = i;
     new_node -> j = j;
     new_node -> next = NULL;
+    int index = i * 64 + j;
 
     while(iterate != NULL){
-        if(iterate == *IListHead){
-            if(iterate -> i > i){
-                *IListHead = new_node;
-                new_node -> next = iterate;
-                break;
-            }else if(iterate -> i == i && iterate -> j > j){
-                *IListHead = new_node;
-                new_node -> next = iterate;
-                break;
-            }
-
-        } else if(iterate == *IListTail){
-            if(iterate -> i < i){
-                *IListTail = new_node;
-                iterate -> next = new_node;
-                break;
-            } else if(iterate -> i == i && iterate -> j < j){
-                *IListTail = new_node;
-                iterate -> next = new_node;
-                break;
-            }
-
-        } else if(iterate -> i >= i && iterate -> next -> i <= i){
-            if(iterate -> i == iterate -> next -> i && iterate -> j < j){
-                struct iterationList *nextTemp = iterate -> next;
-                iterate -> next = new_node;
-                new_node -> next = nextTemp;
-                break;
-            }else if(iterate -> i < iterate -> next -> i){
-                struct iterationList *nextTemp = iterate -> next;
-                iterate -> next = new_node;
-                new_node -> next = nextTemp;
-                break;
-            }
+        
+        if(iterate -> i == i && iterate -> j == j) return;
+        
+        if(iterate == *IListHead && (iterate -> i) * 64 + iterate -> j > index){
+            new_node -> next = *IListHead;
+            *IListHead = new_node;
+            return;
+        } else if(iterate == *IListTail && (iterate -> i) * 64 + iterate -> j < index){
+            (*IListTail) -> next = new_node;
+            *IListTail = new_node;
+            return;
+        } else if((iterate -> i) * 64 + iterate -> j < index && (iterate -> next -> i) * 64 + iterate -> j > index){
+            struct iterationList *next = iterate -> next;
+            iterate -> next = new_node;
+            new_node -> next = next;
+            return;
         }
         iterate = iterate -> next;
     }
@@ -803,12 +788,14 @@ void inserisciInizio(struct Node *(HashTable[64][64]), struct iterationList **IL
 
     while (1) {
 
-        char *word = malloc(k);
         //read the word
-        if (scanf("%s", word) != 1) return;
+        if (scanf("%s", buffer) != 1) return;
 
         //end the function if true
-        if (word[0] == '+' && word[1] == 'i') return;
+        if (buffer[0] == '+' && buffer[1] == 'i') return;
+
+        char *word = malloc(k);
+        strcpy(word, buffer);
 
         struct Node *new_node = malloc(sizeof(struct Node));
         createLeaf(new_node);
@@ -835,20 +822,24 @@ void inserisciInizio(struct Node *(HashTable[64][64]), struct iterationList **IL
                 }
             }
 
-            for (int i = 0; i < k; i++) {
-                int num = lett_number(word[i]);
-                if(count[num] < lett_count[num]){
-                    new_node -> valid = false;
-                    isWordValid = false;
-                }else if(count[num] != lett_count[num] && (lett_count[num] < 0)){
-                    new_node -> valid = false;
-                    isWordValid = false;
+            for(short i = 0; i < 64; i++){
+                if(!isWordValid) break;
+                if(lett_count[i] != (short)INFINITY){
+                    if(count[i] < lett_count[i] && lett_count[i] > 0){
+                        new_node -> valid = false;
+                        isWordValid = false;
+                        break;
+                    }else if(count[i] != lett_count[i] && lett_count[i] <= 0){
+                        new_node -> valid = false;
+                        isWordValid = false;
+                        break;
+                    }
                 }
             }
 
         }
 
-        if(isWordValid && !isNodeInIList(IListHead, lett_number(word[0]), lett_number(word[1]))){
+        if(isWordValid){
             listInsert((short)lett_number(word[0]), (short)lett_number(word[1]), IListHead, IListTail);
         }
         MatrixInsert(HashTable, word);
@@ -908,12 +899,13 @@ int main() {
     //read and store words
     while(1){
 
-        char *word = malloc(k);
-
-        if(scanf("%s", word) != 1) return 0;
+        if(scanf("%s", buffer) != 1) return 0;
 
         //start the game if true
-        if(word[0] == '+' && word[1] == 'n') break;
+        if(buffer[0] == '+' && buffer[1] == 'n') break;
+
+        char *word = malloc(k);
+        strcpy(word, buffer);
 
         MatrixInsert(HashMatrix, word);
     }
@@ -925,7 +917,7 @@ int main() {
     while(true) {
 
         //read reference word
-        char *R_word = malloc(sizeof(char) * k);
+        char *R_word = malloc(k);
         if (scanf("%s", R_word) != 1) return 0;
 
         //create the structure that contains reference word information
@@ -986,12 +978,14 @@ int main() {
         bool found = false;
         while (i < n) {
 
-            char *word = malloc(k);
             char result[k];
 
-            if (scanf("%s", word) != 1) return 0;
+            if (scanf("%s", buffer) != 1) return 0;
 
-            if(word[0] != '+'){
+            if(buffer[0] != '+'){
+
+                char *word = malloc(k);
+                strcpy(word, buffer);
 
                 //if the string is present in the matrix calculate the result and apply constraints
                 if(!isWordPresent(HashMatrix, word)){
@@ -1022,16 +1016,15 @@ int main() {
                 }
             }
             //inserisci inizio
-            else if(word[1] == 'i'){
+            else if(buffer[1] == 'i'){
                 inserisciInizio(HashMatrix, &IListHead, &IListTail, positionInformation, true);
                 continue;
             }
             //stampa filtrate
-            else if(word[1] == 's'){
+            else if(buffer[1] == 's'){
                 stampaFiltrate(HashMatrix, IListHead);
                 continue;
             }
-
             i++;
         }
 
@@ -1042,13 +1035,13 @@ int main() {
         }
 
         while(true){
-            char *game_starter = malloc(17);
-            if (scanf("%s", game_starter) != 1) return 0;
 
-            if(game_starter[0] == '+' && game_starter[1] == 'i'){
+            if (scanf("%s", buffer) != 1) return 0;
+
+            if(buffer[0] == '+' && buffer[1] == 'i'){
                 //INSERISCI INIZIO
                 inserisciInizio(HashMatrix, &IListHead, &IListTail, positionInformation, false);
-            } else if(game_starter[0] == '+' && game_starter[1] == 'n'){
+            } else if(buffer[0] == '+' && buffer[1] == 'n'){
                 resetList(&IListHead, &IListTail);
                 buildList(&IListHead, &IListTail, HashMatrix);
                 resetValid(HashMatrix, IListHead);
@@ -1056,7 +1049,6 @@ int main() {
             }else{
                 return 0;
             }
-
         }
 
     }
