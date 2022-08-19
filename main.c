@@ -838,7 +838,9 @@ void inserisciInizio(struct Box HashTable[64][64], struct iterationList **IListH
         }
 
         if(isWordValid){
-            listInsert((short)lett_number(word[0]), (short)lett_number(word[1]), IListHead, IListTail);
+            if(HashTable[lett_number(word[0])][lett_number(word[1])].validWordInTree == 0){
+                listInsert((short)lett_number(word[0]), (short)lett_number(word[1]), IListHead, IListTail);
+            }
             legalWordCounter++;
 
         }else{
