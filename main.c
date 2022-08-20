@@ -350,14 +350,14 @@ void MatrixInsert(struct Box HashMatrix[64][64], char *word){
     int i = lett_number(word[0]);
     int j = lett_number(word[1]);
 
-    HashMatrix[i][j].wordInTreeFixed += 1;
-    HashMatrix[i][j].validWordInTree += 1;
-
-
     if(HashMatrix[i][j].Tree != NULL){
         RBInsert(&(HashMatrix[i][j].Tree), newNode);
+        HashMatrix[i][j].wordInTreeFixed += 1;
+        HashMatrix[i][j].validWordInTree += 1;
     } else{
         HashMatrix[i][j].Tree = newNode;
+        HashMatrix[i][j].wordInTreeFixed = 1;
+        HashMatrix[i][j].validWordInTree = 1;
     }
 }
 
@@ -521,13 +521,17 @@ void CountConstraints(struct Node *currentNode, const short *countConstraintsInd
     }
 }
 
-void TreeVisitConstraints(struct Node *Root, const char *word, const char* result, short *indexArray, short *countConstraintsIndexes){
+void TreeVisitConstraints(struct Node *Root, const char *word, const char* result, short *indexArray, short *countConstraintsIndexes, bool isFirst){
     if(Root != NULL){
-        if(Root -> valid == true){
+        if(Root -> valid == true || isFirst){
 
             int i = 0;
             while(indexArray[i] <= 1) i++;
             bool dontDo = false;
+
+            if(isFirst){
+                Root -> valid = true;
+            }
 
             while (indexArray[i] != (short) INFINITY) {
                 if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
@@ -549,13 +553,13 @@ void TreeVisitConstraints(struct Node *Root, const char *word, const char* resul
             }
 
         }
-        TreeVisitConstraints(Root -> left_son, word, result, indexArray, countConstraintsIndexes);
-        TreeVisitConstraints(Root -> right_son, word, result, indexArray, countConstraintsIndexes);
+        TreeVisitConstraints(Root -> left_son, word, result, indexArray, countConstraintsIndexes, isFirst);
+        TreeVisitConstraints(Root -> right_son, word, result, indexArray, countConstraintsIndexes, isFirst);
     }
 }
 
 void applyConstraints(struct Box HashTable[64][64], struct iterationList **INodeHead, struct iterationList **INodeTail,
-                      char (*positionInformation)[64],char *word, const char* result){
+                      char (*positionInformation)[64],char *word, const char* result, bool isFirst){
 
     //--------------------------------------------------------------------------------------------------
     //this array contains the count of the letter in the word
@@ -684,51 +688,95 @@ void applyConstraints(struct Box HashTable[64][64], struct iterationList **INode
 
     if(countConstraintsIndexes[0] == (short)INFINITY && indexArray[0] == (short)INFINITY) return;
 
-    struct iterationList *iterate = *INodeHead;
-    struct iterationList *prev = NULL;
+    if(!isFirst){
+        struct iterationList *iterate = *INodeHead;
+        struct iterationList *prev = NULL;
 
-    //go through the list
-    while(iterate != NULL){
-        int i = 0;
+        //go through the list
+        while(iterate != NULL) {
+            int i = 0;
 
-        while(indexArray[i] <= 1) {
-            if(iterate == NULL) return;
+            while (indexArray[i] <= 1) {
+                if (iterate == NULL) return;
 
-            struct iterationList *next = iterate -> next;
+                struct iterationList *next = iterate->next;
 
-            if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
-                (HashTable[iterate->i][iterate->j].Tree->key)[indexArray[i]] == word[indexArray[i]]) {
-                legalWordCounter -= HashTable[iterate->i][iterate->j].validWordInTree;
-                HashTable[iterate->i][iterate->j].validWordInTree = 0;
+                if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
+                    (HashTable[iterate->i][iterate->j].Tree->key)[indexArray[i]] == word[indexArray[i]]) {
+                    legalWordCounter -= HashTable[iterate->i][iterate->j].validWordInTree;
+                    HashTable[iterate->i][iterate->j].validWordInTree = 0;
+                    nodeRemove(iterate, prev, INodeHead, INodeTail);
+                    iterate = next;
+                    i = 0;
+                    continue;
+                } else if (result[indexArray[i]] == '+' &&
+                           (HashTable[iterate->i][iterate->j].Tree->key)[indexArray[i]] != word[indexArray[i]]) {
+                    legalWordCounter -= HashTable[iterate->i][iterate->j].validWordInTree;
+                    HashTable[iterate->i][iterate->j].validWordInTree = 0;
+                    nodeRemove(iterate, prev, INodeHead, INodeTail);
+                    iterate = next;
+                    i = 0;
+                    continue;
+                }
+                i++;
+            }
+
+            int temp = legalWordCounter;
+            TreeVisitConstraints(HashTable[iterate->i][iterate->j].Tree, word, result, indexArray, countConstraintsIndexes, false);
+            HashTable[iterate->i][iterate->j].validWordInTree -= temp - legalWordCounter;
+
+            if (HashTable[iterate->i][iterate->j].validWordInTree == 0) {
+                struct iterationList *next = iterate->next;
                 nodeRemove(iterate, prev, INodeHead, INodeTail);
                 iterate = next;
-                i = 0;
-                continue;
-            } else if (result[indexArray[i]] == '+' &&
-                       (HashTable[iterate->i][iterate->j].Tree->key)[indexArray[i]] != word[indexArray[i]]) {
-                legalWordCounter -= HashTable[iterate->i][iterate->j].validWordInTree;
-                HashTable[iterate->i][iterate->j].validWordInTree = 0;
-                nodeRemove(iterate, prev, INodeHead, INodeTail);
-                iterate = next;
-                i = 0;
                 continue;
             }
-            i++;
+
+            prev = iterate;
+            iterate = iterate->next;
         }
 
-        int temp = legalWordCounter;
-        TreeVisitConstraints(HashTable[iterate -> i][iterate -> j].Tree, word, result, indexArray, countConstraintsIndexes) ;
-        HashTable[iterate -> i][iterate -> j].validWordInTree -= temp - legalWordCounter;
+    }else{
+        for(int i = 0; i < 64; i++){
+            for(int j = 0; j < 64; j++){
 
-        if(HashTable[iterate -> i][iterate -> j].validWordInTree == 0){
-            struct iterationList *next = iterate -> next;
-            nodeRemove(iterate, prev, INodeHead, INodeTail);
-            iterate = next;
-            continue;
+                if(HashTable[i][j].Tree == NULL) continue;
+
+                bool skip = false;
+
+                u = 0;
+                while (indexArray[u] <= 1) {
+
+                    if ((result[indexArray[u]] == '/' || result[indexArray[u]] == '|') &&
+                        (HashTable[i][j].Tree->key)[indexArray[u]] == word[indexArray[u]]) {
+                        legalWordCounter -= HashTable[i][j].wordInTreeFixed;
+                        HashTable[i][j].validWordInTree = 0;
+                        skip = true;
+                        break;
+
+                    } else if (result[indexArray[u]] == '+' &&
+                               (HashTable[i][j].Tree->key)[indexArray[u]] != word[indexArray[u]]) {
+                        legalWordCounter -= HashTable[i][j].wordInTreeFixed;
+                        HashTable[i][j].validWordInTree = 0;
+                        skip = true;
+                        break;
+                    }
+                    u++;
+                }
+
+                if(skip) continue;
+
+                HashTable[i][j].validWordInTree = HashTable[i][j].wordInTreeFixed;
+
+                int temp = legalWordCounter;
+                TreeVisitConstraints(HashTable[i][j].Tree, word, result, indexArray, countConstraintsIndexes, true);
+                HashTable[i][j].validWordInTree -= temp - legalWordCounter;
+
+                if (HashTable[i][j].validWordInTree > 0) {
+                    append(i, j, INodeHead, INodeTail);
+                }
+            }
         }
-
-        prev = iterate;
-        iterate = iterate -> next;
     }
 }
 
@@ -752,12 +800,25 @@ void print_tree(struct Node *Tree){
     }
 }
 
-void stampaFiltrate(struct Box HashTable[64][64], struct iterationList *Head){
-    struct iterationList *iterate = Head;
-    while(iterate != NULL){
-        print_tree(HashTable[iterate -> i][iterate -> j].Tree);
-        iterate = iterate -> next;
+void stampaFiltrate(struct Box HashTable[64][64], struct iterationList *Head, bool isFirst){
+    if(!isFirst){
+        struct iterationList *iterate = Head;
+        while(iterate != NULL){
+            print_tree(HashTable[iterate -> i][iterate -> j].Tree);
+            iterate = iterate -> next;
+        }
+    }else{
+        for(int i = 0; i < 64; i++){
+            for(int j = 0; j < 64; j++){
+                if(HashTable[i][j].Tree != NULL){
+                    print_tree(HashTable[i][j].Tree);
+                    //append(i, j, Head, Tail);
+                    //HashTable[i][j].validWordInTree = HashTable[i][j].wordInTreeFixed;
+                }
+            }
+        }
     }
+
 }
 
 void listInsert(int i, int j, struct iterationList **IListHead,struct iterationList **IListTail){
@@ -907,7 +968,6 @@ int main() {
     for(int i = 0; i < 64; i++){
         for(int j = 0; j < 64; j++){
             HashMatrix[i][j].Tree = NULL;
-            HashMatrix[i][j].validWordInTree = 0;
         }
     }
 
@@ -931,7 +991,6 @@ int main() {
 
     struct iterationList *IListHead = NULL, *IListTail = NULL;
     //create the iteration list
-    buildList(&IListHead, &IListTail, HashMatrix);
 
     while(true) {
 
@@ -995,6 +1054,7 @@ int main() {
         //read word p - note exceptions +inserisci_inizio +stampa_filtrate
         i = 0;
         bool found = false;
+        bool isFirst = true;
         while (i < n) {
 
             char result[k];
@@ -1025,7 +1085,10 @@ int main() {
                     }
                     printf("\n");
 
-                    applyConstraints(HashMatrix, &IListHead, &IListTail, positionInformation,word, result);
+                    applyConstraints(HashMatrix, &IListHead, &IListTail, positionInformation,word, result, isFirst);
+
+                    isFirst = false;
+
 
                     printf("%d\n", legalWordCounter);
 
@@ -1038,11 +1101,10 @@ int main() {
             }
                 //stampa filtrate
             else if(buffer[1] == 's'){
-                stampaFiltrate(HashMatrix, IListHead);
+                stampaFiltrate(HashMatrix, IListHead, isFirst);
                 continue;
             }
             i++;
-
         }
 
         if(found){
@@ -1060,8 +1122,7 @@ int main() {
                 inserisciInizio(HashMatrix, &IListHead, &IListTail, positionInformation, false);
             } else if(buffer[0] == '+' && buffer[1] == 'n'){
                 resetList(&IListHead, &IListTail);
-                buildList(&IListHead, &IListTail, HashMatrix);
-                resetValid(HashMatrix, IListHead);
+
                 legalWordCounter = startingWords;
 
                 for(i = 0; i < hash_dimension; i++){
