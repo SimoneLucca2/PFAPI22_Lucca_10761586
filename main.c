@@ -6,11 +6,15 @@
 #define BigNumShort 32767
 
 typedef enum { false, true } bool;
+typedef enum { red, black } nodeColor;
+
 
 struct Node {
     char *key;
     struct Node *right_son;
     struct Node *left_son;
+    struct Node *parent;
+    nodeColor color;
     bool valid;
 };
 
@@ -51,6 +55,274 @@ int lett_number(char c){
     else return -1;
 }
 
+
+
+
+bool has_right_son(struct Node *node){
+    if(node -> right_son == NULL)
+        return false;
+    return true;
+}
+
+bool has_left_son(struct Node *node){
+    if(node -> left_son == NULL)
+        return false;
+    return true;
+}
+
+void left_rotate(struct Node **Root, struct Node* pivot){
+    struct Node* b;
+    //if the pivot is not the root
+    if(pivot->parent != NULL){
+
+        if(has_right_son(pivot)){
+            b = pivot->right_son;
+            //point 1
+            b->parent = pivot->parent;
+            //point 2
+
+            //if pivot is the right son
+            if(has_right_son(pivot -> parent) && strcmp(pivot -> key, pivot->parent->right_son->key) == 0) {
+                pivot->parent->right_son = b;
+            }
+                //if pivot is the left son
+            else if(pivot->parent->left_son != NULL && strcmp(pivot -> key, pivot->parent->left_son->key) == 0) {
+                pivot->parent->left_son = b;
+            }
+
+            //point 3
+            if(has_left_son(b)) {
+                pivot->right_son = b->left_son;
+                //point 4
+                b->left_son = pivot;
+                //point 5
+                pivot->right_son -> parent = pivot;
+            }
+            else{
+                b->left_son = pivot;
+                pivot -> right_son = NULL;
+            }
+            pivot -> parent = b;
+
+
+        }
+
+    }
+    else{
+
+        if(has_right_son(pivot)){
+            b = pivot->right_son;
+            b->parent = NULL;
+            if(has_left_son(b)) {
+                pivot->right_son = b->left_son;
+                b->left_son = pivot;
+                pivot->right_son -> parent = pivot;
+            }
+            else{
+                b -> left_son = pivot;
+                pivot->right_son = NULL;
+            }
+            pivot -> parent = b;
+
+            *Root = b;
+
+        }
+
+    }
+}
+
+void right_rotate(struct Node **Root, struct Node* pivot){
+    struct Node* a;
+    //if the pivot is not the root
+    if(pivot->parent != NULL){
+
+        if(has_left_son(pivot)){
+            a = pivot->left_son;
+            a->parent = pivot->parent;
+            //if pivot is the left son
+            if(has_left_son(pivot -> parent) && strcmp(pivot -> key, pivot->parent->left_son->key) == 0) {
+                pivot->parent->left_son = a;
+            }
+
+                //if pivot is the right son
+            else{
+                pivot->parent->right_son = a;
+            }
+
+
+            pivot->parent = a;
+            if(has_right_son(a)) {
+                pivot->left_son = a->right_son;
+                a->right_son = pivot;
+                pivot->left_son -> parent = pivot;
+            }
+            else{
+                a->right_son = pivot;
+                pivot -> left_son = NULL;
+            }
+            pivot -> parent = a;
+
+        }
+
+    }
+
+        //here the pivot is the Root, that means the Root has to change
+    else{
+
+        if(has_left_son(pivot)){
+            a = pivot->left_son;
+            a->parent = NULL;
+
+            if(has_right_son(a)) {
+                pivot->left_son = a->right_son;
+                a->right_son = pivot;
+                pivot->left_son -> parent = pivot;
+            }
+            else{
+                a -> right_son = pivot;
+                pivot->left_son = NULL;
+            }
+            pivot -> parent = a;
+
+            *Root = a;
+        }
+
+    }
+}
+
+void RB_insert_fixup(struct Node **Root, struct Node *new_node_ptr) {
+    struct Node *node_parent;
+    struct Node *node_uncle;
+
+    //if the tree was empty before
+    if (new_node_ptr -> parent == NULL) {
+        new_node_ptr->color = black;
+    } else {
+        new_node_ptr->color = red;
+        node_parent = new_node_ptr->parent;
+        //if the parent is red that means that he also has a parent
+        if (node_parent->color == red) {
+
+            //if parent is the left son of the grandfather
+            if ((node_parent->parent)->left_son != NULL && ((node_parent->parent)->left_son)->key == node_parent->key) {
+
+                //initialization
+                bool uncle_exists = false;
+
+                if (( node_parent->parent)->right_son != NULL) {
+                    uncle_exists = true;
+                    node_uncle = (node_parent->parent)->right_son;
+                }
+
+                if (uncle_exists) {
+                    //if the uncle is red, CASE 1
+                    if (node_uncle->color == red) {
+
+                        node_parent->color = black;
+                        node_uncle->color = black;
+
+                        //if the grandparent is not the root
+                        if (strcmp((node_parent->parent)->key, (*Root)->key) != 0) {
+                            (node_parent->parent)->color = red;
+                            //repeat on the grandparent
+                            RB_insert_fixup(Root, node_parent->parent);
+                        }
+                    }
+                }
+                    //NOTE, here the uncle can exist black or not exist
+                    //if the node is the right son, CASE 2
+                else if ((node_parent->right_son != NULL) && (node_parent->right_son)->key == new_node_ptr->key) {
+                    left_rotate(Root, node_parent);
+                    RB_insert_fixup(Root, node_parent);
+                }
+                    //CASE 3
+                else {
+                    node_parent->color = black;
+                    (node_parent->parent)->color = red;
+                    right_rotate(Root, node_parent -> parent);
+                }
+
+            }
+
+                //if parent is the right son of the grandfather
+            else if ((node_parent->parent)->right_son != NULL && ((node_parent->parent)->right_son)->key == node_parent->key) {
+
+                //initialization
+                bool uncle_exists = false;
+
+                if (( node_parent->parent)->left_son != NULL) {
+                    uncle_exists = true;
+                    node_uncle = (node_parent->parent)->left_son;
+                }
+                if(uncle_exists && node_uncle->color == red) {
+                    //if the uncle is red, CASE 1
+                    node_parent->color = black;
+                    node_uncle->color = black;
+                    if (strcmp(node_parent->key, (*Root)->key) != 0) {
+                        (node_parent->parent)->color = red;
+                        //repeat on the grandparent
+                        RB_insert_fixup(Root, node_parent->parent);
+                    }
+                }
+
+                    //if the node is the left son, CASE 2
+                else if(node_parent->left_son != NULL && (node_parent->left_son)->key == new_node_ptr->key) {
+                    right_rotate(Root, node_parent);
+                    RB_insert_fixup(Root, node_parent);
+                }
+
+                    //CASE 3
+                else {
+                    node_parent->color = black;
+                    (node_parent->parent)->color = red;
+                    left_rotate(Root, node_parent -> parent);
+                }
+
+
+            }
+        }
+    }
+}
+
+void RBInsert(struct Node **Root, char *word, bool isWordValid) {
+
+    // variable used to go through nodes in RB tree
+    struct Node *iterate = *Root;
+    struct Node *newNode = malloc(sizeof(struct Node));
+
+    newNode -> right_son = newNode -> left_son = newNode->parent = NULL;
+    newNode -> key = word;
+    newNode -> valid = isWordValid;
+
+    if(*Root == NULL){
+        *Root = newNode;
+    }
+    while(iterate != NULL){
+        if(strcmp(word, iterate -> key) > 0){
+            if(iterate -> right_son == NULL){
+                iterate -> right_son = newNode;
+                break;
+            }
+            iterate = iterate -> right_son;
+        }else if(strcmp(word, iterate -> key) < 0){
+            if(iterate -> left_son == NULL){
+                iterate -> left_son = newNode;
+                break;
+            }
+            iterate = iterate -> left_son;
+        }else{
+            free(newNode);
+            return;
+        }
+
+    }
+
+    // balance the tree
+    RB_insert_fixup(Root, newNode);
+
+}
+
+/*
 void TreeInsert(struct Node **Root, char *word, bool isWordValid){
     struct Node *iterate = *Root;
     struct Node *newNode = malloc(sizeof(struct Node));
@@ -82,7 +354,7 @@ void TreeInsert(struct Node **Root, char *word, bool isWordValid){
 
     }
 }
-
+*/
 
 void MatrixInsert(struct Box HashMatrix[64][64], char *word, bool isWordValid){
 
@@ -94,7 +366,7 @@ void MatrixInsert(struct Box HashMatrix[64][64], char *word, bool isWordValid){
         HashMatrix[i][j].validWordInTree = 0;
     }
 
-    TreeInsert(&(HashMatrix[i][j].Tree), word, isWordValid);
+    RBInsert(&(HashMatrix[i][j].Tree), word, isWordValid);
     HashMatrix[i][j].wordInTreeFixed += 1;
     if(isWordValid){
         HashMatrix[i][j].validWordInTree += 1;
@@ -456,9 +728,9 @@ void print_tree(struct Node *Tree){
 
 void printTreeFirst(struct Node *Tree){
     if(Tree != NULL) {
-        print_tree(Tree->left_son);
+        printTreeFirst(Tree->left_son);
         printf("%s\n", Tree->key);
-        print_tree(Tree->right_son);
+        printTreeFirst(Tree->right_son);
     }
 }
 
@@ -472,22 +744,11 @@ void stampaFiltrate(struct Box HashTable[64][64]){
 
             if(isFirst){
                 printTreeFirst(HashTable[i][j].Tree);
-                //printedWords += HashTable[i][j].wordInTreeFixed;
             }else{
                 print_tree(HashTable[i][j].Tree);
-                //printedWords += HashTable[i][j].validWordInTree;
             }
-
-            //if(printedWords >= legalWordCounter) return;
+            
         }
-    }
-}
-
-void resetValidTree(struct Node *Root){
-    if(Root != NULL) {
-        Root->valid = true;
-        resetValidTree(Root->left_son);
-        resetValidTree(Root->right_son);
     }
 }
 
@@ -728,9 +989,7 @@ int main() {
                 //INSERISCI INIZIO
                 inserisciInizio(HashMatrix, positionInformation, false);
             } else if(buffer[0] == '+' && buffer[1] == 'n'){
-
                 legalWordCounter = 0;
-
                 break;
             }else{
                 return 0;
@@ -739,12 +998,3 @@ int main() {
 
     }
 }
-
-
-
-
-
-
-
-
-
