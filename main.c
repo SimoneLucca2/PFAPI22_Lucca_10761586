@@ -1,20 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-//#include <math.h>
 
-#define BigNumShort 32767
+#define BigNum 2147483647
 
 typedef enum { false, true } bool;
-typedef enum { red, black } nodeColor;
-
 
 struct Node {
     char *key;
     struct Node *right_son;
     struct Node *left_son;
-    struct Node *parent;
-    nodeColor color;
     bool valid;
 };
 
@@ -32,14 +27,13 @@ struct Box{
 };
 
 int n, k;
-int legalWordCounter = 0;
+int legalWordCounter = 0, startingWords = 0;
 char buffer[18];
 
 //information that the user have about the number of letters in the reference word
-short lett_count[64];
+int lett_count[64];
 
 bool isFirst = true;
-
 
 int lett_number(char c){
     if(c == '-')
@@ -55,274 +49,6 @@ int lett_number(char c){
     else return -1;
 }
 
-
-
-
-bool has_right_son(struct Node *node){
-    if(node -> right_son == NULL)
-        return false;
-    return true;
-}
-
-bool has_left_son(struct Node *node){
-    if(node -> left_son == NULL)
-        return false;
-    return true;
-}
-
-void left_rotate(struct Node **Root, struct Node* pivot){
-    struct Node* b;
-    //if the pivot is not the root
-    if(pivot->parent != NULL){
-
-        if(has_right_son(pivot)){
-            b = pivot->right_son;
-            //point 1
-            b->parent = pivot->parent;
-            //point 2
-
-            //if pivot is the right son
-            if(has_right_son(pivot -> parent) && strcmp(pivot -> key, pivot->parent->right_son->key) == 0) {
-                pivot->parent->right_son = b;
-            }
-                //if pivot is the left son
-            else if(pivot->parent->left_son != NULL && strcmp(pivot -> key, pivot->parent->left_son->key) == 0) {
-                pivot->parent->left_son = b;
-            }
-
-            //point 3
-            if(has_left_son(b)) {
-                pivot->right_son = b->left_son;
-                //point 4
-                b->left_son = pivot;
-                //point 5
-                pivot->right_son -> parent = pivot;
-            }
-            else{
-                b->left_son = pivot;
-                pivot -> right_son = NULL;
-            }
-            pivot -> parent = b;
-
-
-        }
-
-    }
-    else{
-
-        if(has_right_son(pivot)){
-            b = pivot->right_son;
-            b->parent = NULL;
-            if(has_left_son(b)) {
-                pivot->right_son = b->left_son;
-                b->left_son = pivot;
-                pivot->right_son -> parent = pivot;
-            }
-            else{
-                b -> left_son = pivot;
-                pivot->right_son = NULL;
-            }
-            pivot -> parent = b;
-
-            *Root = b;
-
-        }
-
-    }
-}
-
-void right_rotate(struct Node **Root, struct Node* pivot){
-    struct Node* a;
-    //if the pivot is not the root
-    if(pivot->parent != NULL){
-
-        if(has_left_son(pivot)){
-            a = pivot->left_son;
-            a->parent = pivot->parent;
-            //if pivot is the left son
-            if(has_left_son(pivot -> parent) && strcmp(pivot -> key, pivot->parent->left_son->key) == 0) {
-                pivot->parent->left_son = a;
-            }
-
-                //if pivot is the right son
-            else{
-                pivot->parent->right_son = a;
-            }
-
-
-            pivot->parent = a;
-            if(has_right_son(a)) {
-                pivot->left_son = a->right_son;
-                a->right_son = pivot;
-                pivot->left_son -> parent = pivot;
-            }
-            else{
-                a->right_son = pivot;
-                pivot -> left_son = NULL;
-            }
-            pivot -> parent = a;
-
-        }
-
-    }
-
-        //here the pivot is the Root, that means the Root has to change
-    else{
-
-        if(has_left_son(pivot)){
-            a = pivot->left_son;
-            a->parent = NULL;
-
-            if(has_right_son(a)) {
-                pivot->left_son = a->right_son;
-                a->right_son = pivot;
-                pivot->left_son -> parent = pivot;
-            }
-            else{
-                a -> right_son = pivot;
-                pivot->left_son = NULL;
-            }
-            pivot -> parent = a;
-
-            *Root = a;
-        }
-
-    }
-}
-
-void RB_insert_fixup(struct Node **Root, struct Node *new_node_ptr) {
-    struct Node *node_parent;
-    struct Node *node_uncle;
-
-    //if the tree was empty before
-    if (new_node_ptr -> parent == NULL) {
-        new_node_ptr->color = black;
-    } else {
-        new_node_ptr->color = red;
-        node_parent = new_node_ptr->parent;
-        //if the parent is red that means that he also has a parent
-        if (node_parent->color == red) {
-
-            //if parent is the left son of the grandfather
-            if ((node_parent->parent)->left_son != NULL && ((node_parent->parent)->left_son)->key == node_parent->key) {
-
-                //initialization
-                bool uncle_exists = false;
-
-                if (( node_parent->parent)->right_son != NULL) {
-                    uncle_exists = true;
-                    node_uncle = (node_parent->parent)->right_son;
-                }
-
-                if (uncle_exists) {
-                    //if the uncle is red, CASE 1
-                    if (node_uncle->color == red) {
-
-                        node_parent->color = black;
-                        node_uncle->color = black;
-
-                        //if the grandparent is not the root
-                        if (strcmp((node_parent->parent)->key, (*Root)->key) != 0) {
-                            (node_parent->parent)->color = red;
-                            //repeat on the grandparent
-                            RB_insert_fixup(Root, node_parent->parent);
-                        }
-                    }
-                }
-                    //NOTE, here the uncle can exist black or not exist
-                    //if the node is the right son, CASE 2
-                else if ((node_parent->right_son != NULL) && (node_parent->right_son)->key == new_node_ptr->key) {
-                    left_rotate(Root, node_parent);
-                    RB_insert_fixup(Root, node_parent);
-                }
-                    //CASE 3
-                else {
-                    node_parent->color = black;
-                    (node_parent->parent)->color = red;
-                    right_rotate(Root, node_parent -> parent);
-                }
-
-            }
-
-                //if parent is the right son of the grandfather
-            else if ((node_parent->parent)->right_son != NULL && ((node_parent->parent)->right_son)->key == node_parent->key) {
-
-                //initialization
-                bool uncle_exists = false;
-
-                if (( node_parent->parent)->left_son != NULL) {
-                    uncle_exists = true;
-                    node_uncle = (node_parent->parent)->left_son;
-                }
-                if(uncle_exists && node_uncle->color == red) {
-                    //if the uncle is red, CASE 1
-                    node_parent->color = black;
-                    node_uncle->color = black;
-                    if (strcmp(node_parent->key, (*Root)->key) != 0) {
-                        (node_parent->parent)->color = red;
-                        //repeat on the grandparent
-                        RB_insert_fixup(Root, node_parent->parent);
-                    }
-                }
-
-                    //if the node is the left son, CASE 2
-                else if(node_parent->left_son != NULL && (node_parent->left_son)->key == new_node_ptr->key) {
-                    right_rotate(Root, node_parent);
-                    RB_insert_fixup(Root, node_parent);
-                }
-
-                    //CASE 3
-                else {
-                    node_parent->color = black;
-                    (node_parent->parent)->color = red;
-                    left_rotate(Root, node_parent -> parent);
-                }
-
-
-            }
-        }
-    }
-}
-
-void RBInsert(struct Node **Root, char *word, bool isWordValid) {
-
-    // variable used to go through nodes in RB tree
-    struct Node *iterate = *Root;
-    struct Node *newNode = malloc(sizeof(struct Node));
-
-    newNode -> right_son = newNode -> left_son = newNode->parent = NULL;
-    newNode -> key = word;
-    newNode -> valid = isWordValid;
-
-    if(*Root == NULL){
-        *Root = newNode;
-    }
-    while(iterate != NULL){
-        if(strcmp(word, iterate -> key) > 0){
-            if(iterate -> right_son == NULL){
-                iterate -> right_son = newNode;
-                break;
-            }
-            iterate = iterate -> right_son;
-        }else if(strcmp(word, iterate -> key) < 0){
-            if(iterate -> left_son == NULL){
-                iterate -> left_son = newNode;
-                break;
-            }
-            iterate = iterate -> left_son;
-        }else{
-            free(newNode);
-            return;
-        }
-
-    }
-
-    // balance the tree
-    RB_insert_fixup(Root, newNode);
-
-}
-
-/*
 void TreeInsert(struct Node **Root, char *word, bool isWordValid){
     struct Node *iterate = *Root;
     struct Node *newNode = malloc(sizeof(struct Node));
@@ -335,13 +61,13 @@ void TreeInsert(struct Node **Root, char *word, bool isWordValid){
         *Root = newNode;
     }
     while(iterate != NULL){
-        if(strcmp(word, iterate -> key) > 0){
+        if(memcmp(word, iterate -> key, k) > 0){
             if(iterate -> right_son == NULL){
                 iterate -> right_son = newNode;
                 break;
             }
             iterate = iterate -> right_son;
-        }else if(strcmp(word, iterate -> key) < 0){
+        }else if(memcmp(word, iterate -> key, k) < 0){
             if(iterate -> left_son == NULL){
                 iterate -> left_son = newNode;
                 break;
@@ -351,10 +77,8 @@ void TreeInsert(struct Node **Root, char *word, bool isWordValid){
             free(newNode);
             return;
         }
-
     }
 }
-*/
 
 void MatrixInsert(struct Box HashMatrix[64][64], char *word, bool isWordValid){
 
@@ -366,7 +90,7 @@ void MatrixInsert(struct Box HashMatrix[64][64], char *word, bool isWordValid){
         HashMatrix[i][j].validWordInTree = 0;
     }
 
-    RBInsert(&(HashMatrix[i][j].Tree), word, isWordValid);
+    TreeInsert(&(HashMatrix[i][j].Tree), word, isWordValid);
     HashMatrix[i][j].wordInTreeFixed += 1;
     if(isWordValid){
         HashMatrix[i][j].validWordInTree += 1;
@@ -375,7 +99,10 @@ void MatrixInsert(struct Box HashMatrix[64][64], char *word, bool isWordValid){
 
 bool IsWordInTree(struct Node *Root, char *word){
     struct Node *iterate = Root;
-    while(iterate != NULL && strcmp(iterate -> key, word) != 0){
+
+    while(iterate != NULL){
+
+        if(memcmp(iterate -> key, word, k) == 0) break;
 
         if(strcmp(word, iterate->key) > 0){
             iterate = iterate -> right_son;
@@ -384,6 +111,7 @@ bool IsWordInTree(struct Node *Root, char *word){
             iterate = iterate -> left_son;
         }
     }
+
     if(iterate == NULL) return false;
     return true;
 }
@@ -476,23 +204,30 @@ void wordResult(const char* reference_word, struct R_Node* hash, int R_hash_dime
     }
 }
 
-void CountConstraints(struct Node *currentNode, const short *countConstraintsIndexes){
+void CountConstraints(struct Node *currentNode, const int *countConstraintsIndexes){
     //here the node is valid
-    short i = 0;
-    while(countConstraintsIndexes[i] != BigNumShort){
-        int count = 0;
-        for(int j = 0; j < k; j++){
-            if(lett_number((currentNode -> key)[j]) == countConstraintsIndexes[i]){
-                count++;
-            }
-        }
+    int i = 0;
+    int tempArr[64];
+
+    while(countConstraintsIndexes[i] != BigNum){
+        tempArr[countConstraintsIndexes[i]] = 0;
+        i++;
+    }
+
+    i = 0;
+
+    for(int j = 0; j < k; j++){
+        tempArr[lett_number((currentNode->key)[j])]++;
+    }
+
+    while(countConstraintsIndexes[i] != BigNum){
 
         int expected = lett_count[countConstraintsIndexes[i]];
-        if(expected <= 0 && count != abs(expected)){
+        if(expected <= 0 && tempArr[countConstraintsIndexes[i]] != (-expected)){
             currentNode -> valid = false;
             legalWordCounter--;
             return;
-        }else if(expected > 0 && count < expected){
+        }else if(expected > 0 && tempArr[countConstraintsIndexes[i]] < expected){
             currentNode -> valid = false;
             legalWordCounter--;
             return;
@@ -501,7 +236,7 @@ void CountConstraints(struct Node *currentNode, const short *countConstraintsInd
     }
 }
 
-void TreeVisitConstraints(struct Node *Root, const char *word, const char* result, short *indexArray, short *countConstraintsIndexes){
+void TreeVisitConstraints(struct Node *Root, const char *word, const char* result, int *indexArray, int *countConstraintsIndexes){
     if(Root != NULL){
         if(Root -> valid == true || isFirst){
 
@@ -513,7 +248,7 @@ void TreeVisitConstraints(struct Node *Root, const char *word, const char* resul
                 Root -> valid = true;
             }
 
-            while (indexArray[i] != BigNumShort) {
+            while (indexArray[i] != BigNum) {
                 if ((result[indexArray[i]] == '/' || result[indexArray[i]] == '|') &&
                     (Root->key)[indexArray[i]] == word[indexArray[i]]) {
                     Root->valid = false;
@@ -540,27 +275,26 @@ void TreeVisitConstraints(struct Node *Root, const char *word, const char* resul
 void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[64],char *word, const char* result){
 
     //--------------------------------------------------------------------------------------------------
-    //this array contains the count of the letter in the word
+    //the array lett_count contains the count of the letter in the word
     // 0 means "the letter is not in the word"
-    // INFINITY means "the user already had this information"
+    // INFINITY means "the user does not have information"
     // positive number means "the user didn't have this information and there could be more letters"
     // negative number means "the user didn't have this information and the letters are exact"
     //--------------------------------------------------------------------------------------------------
 
-    short temporaryCount[64];
+    int temporaryCount[64];
     for(int i = 0; i < 64; i++){
-        temporaryCount[i] = BigNumShort;
+        temporaryCount[i] = BigNum;
     }
 
     //+1 because the last index is used to stop the iteration
-    short countConstraintsIndexes[k+1];
+    int countConstraintsIndexes[k+1];
     int tempIndex = 0;
 
-    for(int i = k-1; i >= 0; i--){
-        short CurrentLettNum = (short)lett_number(word[i]);
+    for(int i = 0; i < k; i++){
+        int CurrentLettNum = lett_number(word[i]);
 
         //--------------------------------------------------------------------------------------------------
-        //going from right to left, so it's easier to count the letters
         //if '/' there are 2 cases -> there are 0 of the corresponding letters
         //                         -> the number of letters is exact (if there is + or | )
         //if '+' or '|' still 2 cases
@@ -569,15 +303,15 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
         //--------------------------------------------------------------------------------------------------
 
 
-        if(result[i] == '/' && temporaryCount[CurrentLettNum] == BigNumShort){
+        if(result[i] == '/' && temporaryCount[CurrentLettNum] == BigNum){
             temporaryCount[CurrentLettNum] = 0;
             countConstraintsIndexes[tempIndex] = CurrentLettNum;
             tempIndex++;
         }
         else if(result[i] == '/' && temporaryCount[CurrentLettNum] > 0){
-            temporaryCount[CurrentLettNum] =  (short)(- temporaryCount[CurrentLettNum]);
+            temporaryCount[CurrentLettNum] = (- temporaryCount[CurrentLettNum]);
         }
-        else if((result[i] == '+' || result[i] == '|') && temporaryCount[CurrentLettNum] == BigNumShort){
+        else if((result[i] == '+' || result[i] == '|') && temporaryCount[CurrentLettNum] == BigNum){
             temporaryCount[CurrentLettNum] = 1;
             countConstraintsIndexes[tempIndex] = CurrentLettNum;
             tempIndex++;
@@ -590,23 +324,27 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
         }
     }
 
-    countConstraintsIndexes[tempIndex] = BigNumShort;
+    countConstraintsIndexes[tempIndex] = BigNum;
 
-    //it is necessary to go through the array again to compare the temporaryCount to the past counts
+    //it is necessary to go through the array to compare the temporaryCount to the past counts
     int u = 0;
     tempIndex = 0;
-    while(countConstraintsIndexes[u] != BigNumShort){
-        //there was no prior information about that letter
-        if(lett_count[countConstraintsIndexes[u]] == BigNumShort){
+    while(countConstraintsIndexes[u] != BigNum){
+
+        if(lett_count[countConstraintsIndexes[u]] <= 0){
+            u++;
+            continue;
+        }
+
+        if(lett_count[countConstraintsIndexes[u]] == BigNum){
             lett_count[countConstraintsIndexes[u]] = temporaryCount[countConstraintsIndexes[u]];
             countConstraintsIndexes[tempIndex] = countConstraintsIndexes[u];
             tempIndex++;
-        } else if(temporaryCount[countConstraintsIndexes[u]] > 0 && lett_count[countConstraintsIndexes[u]] > 0
-                  && temporaryCount[countConstraintsIndexes[u]] > lett_count[countConstraintsIndexes[u]]){
+        } else if(temporaryCount[countConstraintsIndexes[u]] < 0 && lett_count[countConstraintsIndexes[u]] > 0){
             lett_count[countConstraintsIndexes[u]] = temporaryCount[countConstraintsIndexes[u]];
             countConstraintsIndexes[tempIndex] = countConstraintsIndexes[u];
             tempIndex ++;
-        }else if(lett_count[countConstraintsIndexes[u]] + temporaryCount[countConstraintsIndexes[u]] == 0 && temporaryCount[countConstraintsIndexes[u]] < 0){
+        }else if(lett_count[countConstraintsIndexes[u]] < temporaryCount[countConstraintsIndexes[u]] && temporaryCount[countConstraintsIndexes[u]] > 0){
             lett_count[countConstraintsIndexes[u]] = temporaryCount[countConstraintsIndexes[u]];
             countConstraintsIndexes[tempIndex] = countConstraintsIndexes[u];
             tempIndex ++;
@@ -614,19 +352,19 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
         u++;
     }
 
-    countConstraintsIndexes[tempIndex] = BigNumShort;
+    countConstraintsIndexes[tempIndex] = BigNum;
 
     //this array contains the indexes of the letter with more information
-    short indexArray[k+1];
+    int indexArray[k+1];
 
     tempIndex = 0;
     int lastPlus = 0;
     for(int i = 0; i < k; i++){
 
-        short CurrentLettNum = (short)lett_number(word[i]);
+        int CurrentLettNum = lett_number(word[i]);
 
         if((result[i] == '/' || result[i] == '|') && positionInformation[i][CurrentLettNum] != '/'){
-            indexArray[tempIndex] = (short)i;
+            indexArray[tempIndex] = i;
             tempIndex++;
 
             //indexArray is made like this: {0, 1, indexes of +, other indexes, INFINITY, ... }
@@ -636,11 +374,11 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
 
         }else if(result[i] == '+' && positionInformation[i][CurrentLettNum] != '+'){
             if(lastPlus != tempIndex){
-                short temp = indexArray[lastPlus];
-                indexArray[lastPlus] = (short)i;
+                int temp = indexArray[lastPlus];
+                indexArray[lastPlus] = i;
                 indexArray[tempIndex] = temp;
             }else{
-                indexArray[tempIndex] = (short)i;
+                indexArray[tempIndex] = i;
             }
 
             tempIndex++;
@@ -654,7 +392,7 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
         }
     }
 
-    indexArray[tempIndex] = BigNumShort;
+    indexArray[tempIndex] = BigNum;
 
     //--------------------------------------------------------------------------------------------------
     //now there are 2 arrays:
@@ -664,7 +402,7 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
     //but only the new ones
     //--------------------------------------------------------------------------------------------------
 
-    if(countConstraintsIndexes[0] == BigNumShort && indexArray[0] == BigNumShort) return;
+    if(countConstraintsIndexes[0] == BigNum && indexArray[0] == BigNum) return;
 
     for(int i = 0; i < 64; i++){
         for(int j = 0; j < 64; j++){
@@ -684,15 +422,18 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
                 if ((result[indexArray[u]] == '/' || result[indexArray[u]] == '|') &&
                     (HashTable[i][j].Tree->key)[indexArray[u]] == word[indexArray[u]]) {
 
-                    //-1 used to indicate that all the future word inserted in the tree are not valid
-                    HashTable[i][j].validWordInTree = -1;
+                    legalWordCounter -= HashTable[i][j].validWordInTree;
+
+                    HashTable[i][j].validWordInTree = 0;
                     skip = true;
                     break;
 
                 } else if (result[indexArray[u]] == '+' &&
                            (HashTable[i][j].Tree->key)[indexArray[u]] != word[indexArray[u]]) {
 
-                    HashTable[i][j].validWordInTree = -1;
+                    legalWordCounter -= HashTable[i][j].validWordInTree;
+
+                    HashTable[i][j].validWordInTree = 0;
                     skip = true;
                     break;
                 }
@@ -701,19 +442,13 @@ void applyConstraints(struct Box HashTable[64][64], char (*positionInformation)[
 
             if(skip) continue;
 
-            if(isFirst){
-                HashTable[i][j].validWordInTree = HashTable[i][j].wordInTreeFixed;
-            }
-
             int temp = legalWordCounter;
             TreeVisitConstraints(HashTable[i][j].Tree, word, result, indexArray, countConstraintsIndexes);
             HashTable[i][j].validWordInTree -= temp - legalWordCounter;
-            legalWordCounter = temp;
 
         }
     }
     isFirst = false;
-
 }
 
 void print_tree(struct Node *Tree){
@@ -736,6 +471,8 @@ void printTreeFirst(struct Node *Tree){
 
 void stampaFiltrate(struct Box HashTable[64][64]){
 
+    int printedWords = 0;
+
     for(int i = 0; i < 64; i++){
         for(int j = 0; j < 64; j++){
 
@@ -744,17 +481,25 @@ void stampaFiltrate(struct Box HashTable[64][64]){
 
             if(isFirst){
                 printTreeFirst(HashTable[i][j].Tree);
+                printedWords += HashTable[i][j].wordInTreeFixed;
             }else{
                 print_tree(HashTable[i][j].Tree);
+                printedWords += HashTable[i][j].validWordInTree;
             }
-            
+
+            if(printedWords >= legalWordCounter) return;
+
         }
     }
 }
 
 void inserisciInizio(struct Box HashTable[64][64], char (*positionInformation)[64], bool need_constraints){
 
+    bool globalNeedConstraints = need_constraints;
+
     while (1) {
+
+        need_constraints = globalNeedConstraints;
 
         //read the word
         if (scanf("%s", buffer) != 1) return;
@@ -767,13 +512,13 @@ void inserisciInizio(struct Box HashTable[64][64], char (*positionInformation)[6
 
         bool isWordValid = true;
 
-        if(HashTable[lett_number(word[0])][lett_number(word[1])].validWordInTree == -1){
+        if(positionInformation[0][lett_number(word[0])] == '/' || positionInformation[1][lett_number(word[1])] == '/'){
             need_constraints = false;
             isWordValid = false;
         }
 
         if(need_constraints) {
-            short count[64];
+            int count[64];
 
             for(int i = 0; i < 64; i++){
                 count[i] = 0;
@@ -791,12 +536,12 @@ void inserisciInizio(struct Box HashTable[64][64], char (*positionInformation)[6
 
             for(int i = 0; i < 64; i++){
                 if(!isWordValid) break;
-                if(lett_count[i] != BigNumShort){
+                if(lett_count[i] != BigNum){
 
                     if(count[i] < lett_count[i] && lett_count[i] > 0){
                         isWordValid = false;
                         break;
-                    }else if(count[i] != abs(lett_count[i]) && lett_count[i] <= 0){
+                    }else if(count[i] != -lett_count[i] && lett_count[i] <= 0){
                         isWordValid = false;
                         break;
                     }
@@ -805,16 +550,13 @@ void inserisciInizio(struct Box HashTable[64][64], char (*positionInformation)[6
 
         }
 
-        MatrixInsert(HashTable, word, isWordValid);
-    }
-}
-
-void validNodeCounter(struct Box HashTable[64][64]){
-    for(int i = 0; i < 64; i++){
-        for(int j = 0; j < 64; j++){
-            if(HashTable[i][j].Tree != NULL && HashTable[i][j].validWordInTree > 0)
-                legalWordCounter += HashTable[i][j].validWordInTree;
+        if(isWordValid){
+            legalWordCounter++;
         }
+
+        startingWords++;
+
+        MatrixInsert(HashTable, word, isWordValid);
     }
 }
 
@@ -840,12 +582,18 @@ int main() {
         //start the game if true
         if(buffer[0] == '+' && buffer[1] == 'n') break;
 
+        if(buffer[0] == '+' && buffer[1] == 'i') continue;
+
         char *word = malloc(k+1);
 
         memcpy(word, buffer, k+1);
 
+        startingWords++;
+
         MatrixInsert(HashMatrix, word, true);
     }
+
+    legalWordCounter = startingWords;
 
     while(true) {
 
@@ -903,8 +651,9 @@ int main() {
             for(int j = 0; j < k; j++){
                 positionInformation[j][i] = '$';
             }
-            lett_count[i] = BigNumShort;
+            lett_count[i] = BigNum;
         }
+
 
         //read word p - note exceptions +inserisci_inizio +stampa_filtrate
         i = 0;
@@ -938,17 +687,13 @@ int main() {
                     }
                     printf("\n");
 
-                    applyConstraints(HashMatrix, positionInformation,buffer, result);
+                    if(legalWordCounter > 1){
+                        applyConstraints(HashMatrix, positionInformation,buffer, result);
+                    }
 
                     isFirst = false;
 
-                    if(legalWordCounter != 1){
-                        legalWordCounter = 0;
-                        validNodeCounter(HashMatrix);
-                    }
-
                     printf("%d\n", legalWordCounter);
-
                 }
             }
 
@@ -989,7 +734,17 @@ int main() {
                 //INSERISCI INIZIO
                 inserisciInizio(HashMatrix, positionInformation, false);
             } else if(buffer[0] == '+' && buffer[1] == 'n'){
-                legalWordCounter = 0;
+                legalWordCounter = startingWords;
+
+                for(i = 0; i < hash_dimension; i++){
+                    struct R_Node *iterate = R_Hash_table[i].next;
+                    while(iterate != NULL){
+                        struct R_Node *next = iterate -> next;
+                        free(iterate);
+                        iterate = next;
+                    }
+                }
+
                 break;
             }else{
                 return 0;
@@ -998,3 +753,6 @@ int main() {
 
     }
 }
+
+
+
